@@ -22,8 +22,8 @@
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
 
     <Authors>Akchhya Singh</Authors>
-    <Product>Relay</Product>
-    <RepositoryUrl>https://github.com/azzs11/scalable-email-service</RepositoryUrl>
+    <Product>Pigeonhole</Product>
+    <RepositoryUrl>https://github.com/azzs11/pigeonhole</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 

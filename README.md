@@ -1,14 +1,15 @@
-# Relay
+# Pigeonhole
 
-[![ci](https://github.com/azzs11/scalable-email-service/actions/workflows/ci.yml/badge.svg)](https://github.com/azzs11/scalable-email-service/actions/workflows/ci.yml)
+[![ci](https://github.com/azzs11/pigeonhole/actions/workflows/ci.yml/badge.svg)](https://github.com/azzs11/pigeonhole/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Durable, idempotent email delivery for .NET, with provider failover and an
-**Agent Send Guard** that lets AI agents send mail safely.
+**Pigeonhole** is durable, idempotent email delivery for .NET, with provider failover and an
+**Agent Send Guard** that lets AI agents send mail safely. The code name is *Relay*: the .NET
+projects are `Relay.*`. In a postal sorting office, every letter ends up in exactly one pigeonhole.
 
-> **Status: Phase 5 of 8.** Durable, idempotent delivery with failover, signed provider
-> webhooks, suppression, quotas, OpenTelemetry, MailChaos, and the **Agent Send Guard** with an
-> MCP server and AgentMailBench. Nothing
+> **Status: Phase 6 of 8.** Durable, idempotent delivery with failover, signed provider
+> webhooks, suppression, quotas, OpenTelemetry, MailChaos, the **Agent Send Guard** with an MCP
+> server and AgentMailBench, and the sorting-office dashboard. Nothing
 > below is a measured claim until a benchmark result in `bench/results/` backs it.
 
 ## Headline results: MailChaos
@@ -88,6 +89,23 @@ Observability (optional): `docker compose -f deploy/docker-compose.yml --profile
 starts Prometheus (:9090), Jaeger (:16686) and Grafana (:3001, "Relay overview" dashboard).
 `GET /v1/messages/{id}/explain` describes every state change in plain language.
 
+### Dashboard
+
+```bash
+cd web && npm install && npm run dev        # http://localhost:5173 (proxies /v1 to the API on :5238)
+```
+
+Paste an API key to open the **sorting office**: a floor plan where messages flow from Intake
+through the Agent Guard and the outbox to the providers and into the Delivered, Returned,
+Unknown or Dead letter bins. In Development the **sandbox** is on. You can send a test batch,
+switch providers off, slow them down, or crash the worker after a send, and watch the three
+promises (nothing sent twice, nothing lost, everything explained) stay green, checked against
+what actually reached Mailpit. Other pages: Messages (a timeline of every state change),
+Approvals (A to approve, R to reject), Suppressions, Providers (live circuit state), Chaos run
+(the MailChaos results) and Settings. The API client is generated from the OpenAPI document
+(`web/scripts/gen-api.sh`). Tests: `npm test` (components), `npm run e2e` (Playwright flow plus an
+axe check of every page in light and dark mode; it needs the API, the worker and compose running).
+
 ### Connect an AI agent (MCP)
 
 ```bash
@@ -122,8 +140,8 @@ they don't.
 2. Delivery engine: outbox relay, providers, retries, failover
 3. Webhooks, suppression, atomic quotas
 4. Observability and **MailChaos**, a failure-injection benchmark
-5. Agent Send Guard, MCP server and **AgentMailBench** ← *you are here*
-6. Dashboard
+5. Agent Send Guard, MCP server and **AgentMailBench**
+6. Dashboard ← *you are here*
 7. Docs, one-command demo, v1.0.0
 
 ## License
