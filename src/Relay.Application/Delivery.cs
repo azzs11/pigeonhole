@@ -69,6 +69,12 @@ public enum UnknownOutcomePolicy
 
     /// <summary>Wait the reconcile window, then send again (may duplicate if the first attempt landed).</summary>
     RetryAfterWindow,
+
+    /// <summary>
+    /// Treat unknown as failed and resend at once. This is "an outbox without an Unknown state";
+    /// it exists as the MailChaos baseline and duplicates whenever the first attempt landed.
+    /// </summary>
+    RetryImmediately,
 }
 
 public sealed record DeliveryOptions

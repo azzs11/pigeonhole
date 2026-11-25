@@ -15,6 +15,7 @@ internal static class MessageEndpoints
         group.MapPost("/", Send).RequireAuthorization(Scopes.MessagesSend);
         group.MapPost("/bulk", SendBulk).RequireAuthorization(Scopes.MessagesSend);
         group.MapGet("/{id:guid}", Get).RequireAuthorization(Scopes.MessagesRead);
+        group.MapGet("/{id:guid}/explain", Explain).RequireAuthorization(Scopes.MessagesRead);
         group.MapGet("/", List).RequireAuthorization(Scopes.MessagesRead);
     }
 
@@ -92,6 +93,15 @@ internal static class MessageEndpoints
         return message is null
             ? TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: "Message not found.")
             : TypedResults.Ok(MessageDetailsResponse.Create(message));
+    }
+
+    private static async Task<Results<Ok<Explanation>, ProblemHttpResult>> Explain(
+        Guid id, ClaimsPrincipal user, IMessageRepository messages, CancellationToken cancellationToken)
+    {
+        var message = await messages.FindAsync(user.TenantId(), id, cancellationToken);
+        return message is null
+            ? TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: "Message not found.")
+            : TypedResults.Ok(MessageExplainer.Explain(message));
     }
 
     private static async Task<Results<Ok<MessagePage>, ValidationProblem>> List(

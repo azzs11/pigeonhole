@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using Polly;
 using Polly.CircuitBreaker;
 using Polly.Retry;
@@ -43,12 +44,16 @@ public sealed class ProviderChain
         (ProviderOutcome, string) last = (ProviderOutcome.Transient("No delivery provider is configured"), "none");
         foreach (var provider in candidates)
         {
+            using var activity = RelayTelemetry.Source.StartActivity("relay.provider.send");
+            activity?.SetTag("relay.provider", provider.Name);
+            var started = _time.GetTimestamp();
             try
             {
                 var outcome = await Pipeline(provider).ExecuteAsync(
                     static (state, token) => new ValueTask<ProviderOutcome>(state.provider.SendAsync(state.email, token)),
                     (provider, email),
                     cancellationToken);
+                Record(provider.Name, outcome.Kind, started, activity);
                 if (outcome.Kind != ProviderOutcomeKind.Transient)
                 {
                     return (outcome, provider.Name);
@@ -58,16 +63,28 @@ public sealed class ProviderChain
             }
             catch (BrokenCircuitException)
             {
+                Record(provider.Name, ProviderOutcomeKind.Transient, started, activity, "circuit_open");
                 last = (ProviderOutcome.Transient("Circuit open"), provider.Name);
             }
             catch (TimeoutRejectedException)
             {
+                Record(provider.Name, ProviderOutcomeKind.Unknown, started, activity, "timeout");
                 // The provider may have the message: never fail over, or we could send twice.
                 return (ProviderOutcome.Unknown($"Timed out after {_options.ProviderTimeoutSeconds}s"), provider.Name);
             }
         }
 
         return last;
+    }
+
+    private void Record(string provider, ProviderOutcomeKind kind, long started, Activity? activity, string? reason = null)
+    {
+        var outcome = reason ?? kind.ToString();
+        activity?.SetTag("relay.outcome", outcome);
+        RelayTelemetry.ProviderSends.Add(1,
+            new KeyValuePair<string, object?>("provider", provider), new KeyValuePair<string, object?>("outcome", outcome));
+        RelayTelemetry.ProviderSendDuration.Record(_time.GetElapsedTime(started).TotalMilliseconds,
+            new KeyValuePair<string, object?>("provider", provider));
     }
 
     private ResiliencePipeline<ProviderOutcome> Pipeline(IEmailProvider provider) =>

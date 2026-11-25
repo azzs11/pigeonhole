@@ -17,6 +17,22 @@ public sealed class RelayDbContext(DbContextOptions<RelayDbContext> options) : D
     public DbSet<Suppression> Suppressions => Set<Suppression>();
     public DbSet<ProviderEvent> ProviderEvents => Set<ProviderEvent>();
 
+    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        // Count state changes once they are durable: every appended MessageEvent that moves status.
+        var moves = ChangeTracker.Entries<MessageEvent>()
+            .Where(e => e.State == EntityState.Added && e.Entity.FromStatus != e.Entity.ToStatus)
+            .Select(e => e.Entity.ToStatus)
+            .ToList();
+        var saved = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        foreach (var to in moves)
+        {
+            Application.RelayTelemetry.Transitions.Add(1, new KeyValuePair<string, object?>("status", to.ToString()));
+        }
+
+        return saved;
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
@@ -91,6 +107,7 @@ public sealed class RelayDbContext(DbContextOptions<RelayDbContext> options) : D
         b.Property(o => o.LockedBy).HasMaxLength(100);
         b.Property(o => o.LockedBy).IsConcurrencyToken();
         b.Property(o => o.PinnedProvider).HasMaxLength(100);
+        b.Property(o => o.TraceParent).HasMaxLength(128);
         b.HasIndex(o => o.MessageId).IsUnique();
         b.HasIndex(o => o.AvailableAt).HasFilter("processed_at IS NULL");
         b.HasOne<Message>().WithMany().HasForeignKey(o => o.MessageId);

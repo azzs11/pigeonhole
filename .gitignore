@@ -483,3 +483,6 @@ $RECYCLE.BIN/
 
 # Local Claude Code guidance (not shared)
 CLAUDE.md
+
+# Benchmark plotting virtualenv
+bench/.venv/

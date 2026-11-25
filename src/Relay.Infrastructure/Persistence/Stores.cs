@@ -51,6 +51,7 @@ internal sealed class MessageRepository(RelayDbContext db) : IMessageRepository
             TenantId = m.TenantId,
             CreatedAt = now,
             AvailableAt = now,
+            TraceParent = System.Diagnostics.Activity.Current is { IdFormat: System.Diagnostics.ActivityIdFormat.W3C } a ? a.Id : null,
         }));
 
         try

@@ -75,6 +75,13 @@ public static class DependencyInjection
         return services;
     }
 
+    /// <summary>Sampled gauges (messages by state, outbox depth). Refreshed by the worker.</summary>
+    public static IServiceCollection AddRelayQueueMetrics(this IServiceCollection services)
+    {
+        services.TryAddSingleton<Observability.QueueMetrics>();
+        return services;
+    }
+
     private static InvalidOperationException Missing(ProviderSettings p) =>
         new($"Provider '{p.Name}' of type {p.Type} has no {p.Type} settings.");
 }

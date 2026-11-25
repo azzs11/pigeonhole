@@ -69,7 +69,13 @@ public sealed class SendMessageHandler(
             key is null ? null : bulk ? $"{key}#{i}" : key,
             key is null ? null : requestHash, options.MessageIdDomain, now)).ToList();
 
-        return await messages.AddAcceptedAsync(accepted, recipients.Count, cancellationToken) switch
+        var result = await messages.AddAcceptedAsync(accepted, recipients.Count, cancellationToken);
+        if (result is AddSucceeded)
+        {
+            RelayTelemetry.MessagesAccepted.Add(accepted.Count);
+        }
+
+        return result switch
         {
             AddSucceeded => new SendAccepted(accepted, Replayed: false),
             AddDuplicate duplicate => Replay(duplicate.Existing, requestHash),

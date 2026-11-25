@@ -1,17 +1,21 @@
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 using Relay.Api;
 using Relay.Api.Auth;
 using Relay.Api.Endpoints;
 using Relay.Application;
 using Relay.Infrastructure;
+using Relay.Infrastructure.Observability;
 using Relay.Infrastructure.Persistence;
 using Relay.Infrastructure.Webhooks;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
+builder.AddRelayObservability("relay-api").WithTracing(t => t.AddAspNetCoreInstrumentation()).WithMetrics(m => m.AddAspNetCoreInstrumentation());
 
 var connectionString = config.GetConnectionString("Relay")
     ?? throw new InvalidOperationException("ConnectionStrings:Relay is not configured.");

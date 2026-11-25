@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,8 +26,11 @@ public sealed partial class DeliveryEngine(
         await using (var scope = scopes.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<RelayDbContext>();
+            var started = time.GetTimestamp();
             claimed = await OutboxClaimer.ClaimAsync(
                 db, WorkerId, options.BatchSize, time.GetUtcNow(), TimeSpan.FromSeconds(options.LeaseSeconds), cancellationToken);
+            RelayTelemetry.ClaimDuration.Record(time.GetElapsedTime(started).TotalMilliseconds);
+            RelayTelemetry.Claimed.Add(claimed.Count);
         }
 
         foreach (var outboxId in claimed)
@@ -52,6 +56,12 @@ public sealed partial class DeliveryEngine(
         {
             return;
         }
+
+        // Continue the trace of the API request that accepted this message.
+        ActivityContext.TryParse(entry.TraceParent, null, out var parent);
+        using var activity = RelayTelemetry.Source.StartActivity("relay.deliver", ActivityKind.Consumer, parent);
+        activity?.SetTag("relay.message.id", entry.MessageId);
+        activity?.SetTag("relay.attempt", entry.Attempts + 1);
 
         var message = await db.Messages.Include(m => m.Events).SingleAsync(m => m.Id == entry.MessageId, cancellationToken);
         var now = time.GetUtcNow();
@@ -101,6 +111,8 @@ public sealed partial class DeliveryEngine(
         await db.SaveChangesAsync(cancellationToken);
 
         var (outcome, provider) = await providers.SendAsync(OutgoingEmail.Create(message), entry.PinnedProvider, cancellationToken);
+        activity?.SetTag("relay.provider", provider);
+        activity?.SetTag("relay.outcome", outcome.Kind.ToString());
         now = time.GetUtcNow();
         message.RecordProvider(provider, outcome.ProviderMessageId);
         switch (outcome.Kind)
@@ -142,6 +154,10 @@ public sealed partial class DeliveryEngine(
         else if (entry.Attempts < options.MaxAttempts && options.UnknownOutcome == UnknownOutcomePolicy.RetryAfterWindow)
         {
             Reschedule(entry, now + TimeSpan.FromSeconds(options.ReconcileWindowSeconds), pinnedProvider: null);
+        }
+        else if (entry.Attempts < options.MaxAttempts && options.UnknownOutcome == UnknownOutcomePolicy.RetryImmediately)
+        {
+            Reschedule(entry, now, pinnedProvider: null);
         }
         else
         {

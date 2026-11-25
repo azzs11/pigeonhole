@@ -27,6 +27,14 @@ public sealed class DeliveryEventProcessor(
     public async Task<EventResult> ProcessAsync(DeliveryEvent e, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(e);
+        var result = await ProcessCoreAsync(e, cancellationToken);
+        RelayTelemetry.WebhookEvents.Add(1,
+            new KeyValuePair<string, object?>("provider", e.Provider), new KeyValuePair<string, object?>("result", result.ToString()));
+        return result;
+    }
+
+    private async Task<EventResult> ProcessCoreAsync(DeliveryEvent e, CancellationToken cancellationToken)
+    {
         var now = time.GetUtcNow();
         var message = await FindMessageAsync(e, cancellationToken);
         if (message?.Status == MessageStatus.Sending)

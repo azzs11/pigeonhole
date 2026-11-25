@@ -1,9 +1,11 @@
 using Relay.Application;
 using Relay.Infrastructure;
 using Relay.Infrastructure.Delivery;
+using Relay.Infrastructure.Observability;
 using Relay.Worker;
 
 var builder = Host.CreateApplicationBuilder(args);
+builder.AddRelayObservability("relay-worker");
 
 var connectionString = builder.Configuration.GetConnectionString("Relay")
     ?? throw new InvalidOperationException("ConnectionStrings:Relay is not configured.");
@@ -19,7 +21,9 @@ builder.Services
     .AddRelayCore(connectionString, messaging)
     .AddRelayDelivery(delivery)
     .AddRelayProviders(providers)
-    .AddHostedService<OutboxRelayService>();
+    .AddRelayQueueMetrics()
+    .AddHostedService<OutboxRelayService>()
+    .AddHostedService<MetricsSnapshotService>();
 
 using var host = builder.Build();
 await host.RunAsync();

@@ -18,4 +18,7 @@ public sealed class OutboxMessage
 
     /// <summary>Set after an unknown outcome on an idempotent provider: retry only there.</summary>
     public string? PinnedProvider { get; set; }
+
+    /// <summary>W3C traceparent of the request that accepted the message, so the worker continues its trace.</summary>
+    public string? TraceParent { get; set; }
 }

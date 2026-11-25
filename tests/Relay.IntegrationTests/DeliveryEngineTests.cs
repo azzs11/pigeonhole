@@ -237,3 +237,54 @@ public class DeliverySuppressionTests(RelayFixture fixture)
         provider.Calls.ShouldBe(0);
     }
 }
+
+[Collection(RelayTestGroup.Name)]
+public class DeliveryTracingTests(RelayFixture fixture)
+{
+    [Fact]
+    public async Task Worker_span_continues_the_trace_of_the_accepting_request()
+    {
+        var spans = new System.Collections.Concurrent.ConcurrentBag<System.Diagnostics.Activity>();
+        using var listener = new System.Diagnostics.ActivityListener
+        {
+            ShouldListenTo = s => s.Name == RelayTelemetry.Name,
+            Sample = (ref System.Diagnostics.ActivityCreationOptions<System.Diagnostics.ActivityContext> _) =>
+                System.Diagnostics.ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = spans.Add,
+        };
+        System.Diagnostics.ActivitySource.AddActivityListener(listener);
+        var provider = new ScriptedProvider("p", false, ProviderOutcome.Sent("p"));
+        await using var h = await DeliveryHarness.CreateAsync(fixture, new DeliveryOptions(), s => s.AddSingleton<IEmailProvider>(provider));
+
+        Guid id;
+        System.Diagnostics.ActivityTraceId requestTrace;
+        using (var request = RelayTelemetry.Source.StartActivity("test.request"))
+        {
+            requestTrace = request!.TraceId;
+            id = await h.AcceptAsync();
+        }
+
+        (await h.LoadAsync(id)).Outbox.TraceParent.ShouldNotBeNull().ShouldContain(requestTrace.ToHexString());
+        await h.Engine.RunOnceAsync(default);
+
+        var deliver = spans.Single(a => a.OperationName == "relay.deliver" && Equals(a.GetTagItem("relay.message.id"), id));
+        deliver.TraceId.ShouldBe(requestTrace);
+        spans.ShouldContain(a => a.OperationName == "relay.provider.send" && a.ParentSpanId == deliver.SpanId);
+    }
+
+    [Fact]
+    public async Task Retry_immediately_policy_resends_unknown_outcomes_at_once()
+    {
+        var flaky = new ScriptedProvider("p", false, ProviderOutcome.Unknown("timeout"), ProviderOutcome.Sent("p"));
+        await using var h = await DeliveryHarness.CreateAsync(fixture,
+            new DeliveryOptions { UnknownOutcome = UnknownOutcomePolicy.RetryImmediately, ProviderRetries = 0 },
+            s => s.AddSingleton<IEmailProvider>(flaky));
+        var id = await h.AcceptAsync();
+
+        await h.Engine.RunOnceAsync(default);
+        await h.Engine.RunOnceAsync(default);
+
+        (await h.LoadAsync(id)).Message.Status.ShouldBe(MessageStatus.Sent);
+        flaky.Calls.ShouldBe(2);
+    }
+}

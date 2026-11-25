@@ -25,5 +25,38 @@ services:
       - "1025:1025" # SMTP sink: nothing leaves this container
       - "8025:8025" # web UI and API: http://localhost:8025
 
+  # --- Observability (docker compose --profile observability up -d) ---
+  prometheus:
+    image: prom/prometheus:v3.16.0
+    profiles: [observability]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-otlp-receiver # services push metrics over OTLP/HTTP
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+
+  jaeger:
+    image: jaegertracing/jaeger:2.23.0
+    profiles: [observability]
+    ports:
+      - "16686:16686" # UI
+      - "4318:4318" # OTLP/HTTP traces
+
+  grafana:
+    image: grafana/grafana:13.3.2
+    profiles: [observability]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin # local only
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3001:3000" # 3000 is often taken by dev servers
+    depends_on: [prometheus]
+
 volumes:
   pgdata:
