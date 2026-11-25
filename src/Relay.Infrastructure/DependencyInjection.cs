@@ -30,6 +30,8 @@ public static class DependencyInjection
         services.AddScoped<ISuppressionStore, SuppressionStore>();
         services.AddScoped<SendMessageHandler>();
         services.AddScoped<ApiKeyService>();
+        services.AddScoped<Relay.Guard.IGuardStore, GuardStore>();
+        services.AddScoped<Relay.Guard.AgentGuardService>();
         return services;
     }
 

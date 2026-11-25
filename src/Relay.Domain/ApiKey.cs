@@ -19,10 +19,13 @@ public sealed class ApiKey
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? RevokedAt { get; private set; }
 
+    /// <summary>Set for agent run tokens: the key may act only within this run.</summary>
+    public Guid? RunId { get; private set; }
+
     public bool IsActive => RevokedAt is null;
 
     public static ApiKey Create(
-        Guid id, Guid tenantId, string name, string prefix, string hash, IReadOnlyList<string> scopes, DateTimeOffset now)
+        Guid id, Guid tenantId, string name, string prefix, string hash, IReadOnlyList<string> scopes, DateTimeOffset now, Guid? runId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(prefix);
         ArgumentException.ThrowIfNullOrWhiteSpace(hash);
@@ -35,6 +38,7 @@ public sealed class ApiKey
             Prefix = prefix,
             Hash = hash,
             Scopes = [.. scopes],
+            RunId = runId,
             CreatedAt = now,
         };
     }

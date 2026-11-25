@@ -20,3 +20,6 @@ public sealed record SendSuppressed(IReadOnlyList<string> Addresses) : SendOutco
 public sealed record SendQuotaExceeded(TimeSpan RetryAfter) : SendOutcome;
 
 public sealed record SendPaused(string Reason) : SendOutcome;
+
+/// <summary>Extra context for sends that come through the Agent Send Guard.</summary>
+public sealed record SendContext(Guid AgentRunId, string ContentHash, string? HoldReason);

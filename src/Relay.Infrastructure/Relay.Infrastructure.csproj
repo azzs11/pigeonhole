@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Relay.Application\Relay.Application.csproj" />
+    <ProjectReference Include="..\Relay.Guard\Relay.Guard.csproj" />
   </ItemGroup>
 
 </Project>

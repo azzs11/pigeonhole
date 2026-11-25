@@ -44,7 +44,8 @@ internal sealed class MessageRepository(RelayDbContext db) : IMessageRepository
         }
 
         db.Messages.AddRange(messages);
-        db.Outbox.AddRange(messages.Select(m => new OutboxMessage
+        // Held messages (awaiting approval) get their outbox row only when approved.
+        db.Outbox.AddRange(messages.Where(m => m.Status == MessageStatus.Accepted).Select(m => new OutboxMessage
         {
             Id = Guid.CreateVersion7(now),
             MessageId = m.Id,

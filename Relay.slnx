@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/bench/">
+    <Project Path="bench/AgentMailBench/AgentMailBench.csproj" />
     <Project Path="bench/MailChaos/MailChaos.csproj" />
   </Folder>
   <Folder Name="/src/">

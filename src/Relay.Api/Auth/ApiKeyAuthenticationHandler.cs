@@ -19,6 +19,7 @@ internal sealed class ApiKeyAuthenticationHandler(
     public const string SchemeName = "ApiKey";
     public const string TenantClaim = "tenant_id";
     public const string ScopeClaim = "scope";
+    public const string RunClaim = "run_id";
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
@@ -40,6 +41,10 @@ internal sealed class ApiKeyAuthenticationHandler(
             new(TenantClaim, key.TenantId.ToString()),
             .. key.Scopes.Select(s => new Claim(ScopeClaim, s)),
         ];
+        if (key.RunId is { } runId)
+        {
+            claims = [.. claims, new Claim(RunClaim, runId.ToString())];
+        }
         var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, SchemeName));
         return AuthenticateResult.Success(new AuthenticationTicket(principal, SchemeName));
     }
@@ -66,6 +71,9 @@ internal sealed class ApiKeyAuthenticationHandler(
 
 internal static class ClaimsPrincipalExtensions
 {
+    public static Guid? RunId(this ClaimsPrincipal user) =>
+        Guid.TryParse(user.FindFirstValue(ApiKeyAuthenticationHandler.RunClaim), out var id) ? id : null;
+
     public static Guid TenantId(this ClaimsPrincipal user) =>
         Guid.Parse(user.FindFirstValue(ApiKeyAuthenticationHandler.TenantClaim)
                    ?? throw new InvalidOperationException("Authenticated principal has no tenant."));

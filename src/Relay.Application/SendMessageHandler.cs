@@ -9,6 +9,11 @@ public sealed class SendMessageHandler(
 {
     public Task<SendOutcome> HandleAsync(
         Guid tenantId, SendMessageRequest request, string? idempotencyKey, CancellationToken cancellationToken)
+        => HandleAsync(tenantId, request, idempotencyKey, context: null, cancellationToken);
+
+    /// <summary>As above; <paramref name="context"/> tags the message with its agent run and can hold it for approval.</summary>
+    public Task<SendOutcome> HandleAsync(
+        Guid tenantId, SendMessageRequest request, string? idempotencyKey, SendContext? context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         var errors = MessageValidator.Validate(request, options);
@@ -20,7 +25,7 @@ public sealed class SendMessageHandler(
 
         var draft = new MessageDraft(request.From ?? options.DefaultFrom, request.To!, request.Cc ?? [], request.Bcc ?? [],
             request.Subject!, request.Text, request.Html);
-        return AcceptAsync(tenantId, [draft], Hash(draft), idempotencyKey, bulk: false, cancellationToken);
+        return AcceptAsync(tenantId, [draft], Hash(draft), idempotencyKey, bulk: false, context, cancellationToken);
     }
 
     public Task<SendOutcome> HandleBulkAsync(
@@ -41,11 +46,12 @@ public sealed class SendMessageHandler(
             .Select(r => new MessageDraft(from, [r], [], [], request.Subject!, request.Text, request.Html))
             .ToList();
         var hash = Hash(new { from, request.Recipients, request.Subject, request.Text, request.Html });
-        return AcceptAsync(tenantId, drafts, hash, idempotencyKey, bulk: true, cancellationToken);
+        return AcceptAsync(tenantId, drafts, hash, idempotencyKey, bulk: true, context: null, cancellationToken);
     }
 
     private async Task<SendOutcome> AcceptAsync(
-        Guid tenantId, IReadOnlyList<MessageDraft> drafts, string requestHash, string? key, bool bulk, CancellationToken cancellationToken)
+        Guid tenantId, IReadOnlyList<MessageDraft> drafts, string requestHash, string? key, bool bulk, SendContext? context,
+        CancellationToken cancellationToken)
     {
         if (key is not null)
         {
@@ -68,6 +74,18 @@ public sealed class SendMessageHandler(
             Guid.CreateVersion7(now), tenantId, draft,
             key is null ? null : bulk ? $"{key}#{i}" : key,
             key is null ? null : requestHash, options.MessageIdDomain, now)).ToList();
+        if (context is not null)
+        {
+            foreach (var m in accepted)
+            {
+                m.AttachAgentContext(context.AgentRunId, context.ContentHash);
+                if (context.HoldReason is not null)
+                {
+                    m.Transition(MessageStatus.Held, now, context.HoldReason);
+                }
+            }
+        }
+
 
         var result = await messages.AddAcceptedAsync(accepted, recipients.Count, cancellationToken);
         if (result is AddSucceeded)

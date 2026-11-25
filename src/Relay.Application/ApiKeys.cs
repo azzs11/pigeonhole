@@ -23,7 +23,7 @@ public interface ITenantStore
     Task AddAsync(Tenant tenant, CancellationToken cancellationToken);
 }
 
-public sealed record AuthenticatedKey(Guid KeyId, Guid TenantId, IReadOnlyList<string> Scopes);
+public sealed record AuthenticatedKey(Guid KeyId, Guid TenantId, IReadOnlyList<string> Scopes, Guid? RunId = null);
 
 public sealed record IssuedKey(ApiKey Key, string Plaintext);
 
@@ -92,6 +92,18 @@ public sealed class ApiKeyService(IApiKeyStore keys, ITenantStore tenants, Messa
         return new IssuedKey(key, plaintext);
     }
 
+    /// <summary>A token that can only send through the Guard within one agent run.</summary>
+    public async Task<IssuedKey> IssueRunTokenAsync(Guid tenantId, Guid runId, CancellationToken cancellationToken)
+    {
+        var now = time.GetUtcNow();
+        var (prefix, plaintext) = ApiKeyFormat.Generate();
+        var key = ApiKey.Create(Guid.CreateVersion7(now), tenantId, $"run {runId}", prefix, ApiKeyFormat.Hash(plaintext),
+            [Scopes.AgentSend], now, runId);
+        await keys.AddAsync(key, cancellationToken);
+        await keys.SaveChangesAsync(cancellationToken);
+        return new IssuedKey(key, plaintext);
+    }
+
     public async Task<bool> RevokeAsync(string prefix, CancellationToken cancellationToken)
     {
         var key = await keys.FindByPrefixAsync(prefix, cancellationToken);
@@ -116,6 +128,6 @@ public sealed class ApiKeyService(IApiKeyStore keys, ITenantStore tenants, Messa
         var expected = key is null ? DummyHash : Convert.FromHexString(key.Hash);
         var actual = SHA256.HashData(Encoding.UTF8.GetBytes(presented!));
         var matches = CryptographicOperations.FixedTimeEquals(expected, actual);
-        return key is not null && matches ? new AuthenticatedKey(key.Id, key.TenantId, key.Scopes) : null;
+        return key is not null && matches ? new AuthenticatedKey(key.Id, key.TenantId, key.Scopes, key.RunId) : null;
     }
 }

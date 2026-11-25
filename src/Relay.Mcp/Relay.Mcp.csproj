@@ -1,9 +1,18 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- MCP server exposing the Guard (Phase 5). Becomes an executable then. -->
+  <!-- MCP server (stdio) exposing the Agent Send Guard. A thin client over the Relay API: all checks run server-side. -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Relay.Guard\Relay.Guard.csproj" />
+    <PackageReference Include="ModelContextProtocol" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Relay.IntegrationTests" />
   </ItemGroup>
 
 </Project>

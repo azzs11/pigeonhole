@@ -37,6 +37,12 @@ public sealed class Message
     public string InternetMessageId { get; private set; } = string.Empty;
     public string? ProviderName { get; private set; }
     public string? ProviderMessageId { get; private set; }
+
+    /// <summary>Set when an AI agent sent this through the Agent Send Guard.</summary>
+    public Guid? AgentRunId { get; private set; }
+
+    /// <summary>Hash of the normalized subject and body, for near-duplicate suppression.</summary>
+    public string? ContentHash { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
     public IReadOnlyList<MessageEvent> Events => _events;
@@ -80,6 +86,12 @@ public sealed class Message
         };
         message._events.Add(new MessageEvent(id, 1, null, MessageStatus.Accepted, now, "Accepted"));
         return message;
+    }
+
+    public void AttachAgentContext(Guid runId, string contentHash)
+    {
+        AgentRunId = runId;
+        ContentHash = contentHash;
     }
 
     /// <summary>Records which provider handled the latest attempt (and its id, once known).</summary>

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Relay.Domain;
+using Relay.Guard;
 
 namespace Relay.Infrastructure.Persistence;
 
@@ -16,6 +17,9 @@ public sealed class RelayDbContext(DbContextOptions<RelayDbContext> options) : D
     public DbSet<OutboxMessage> Outbox => Set<OutboxMessage>();
     public DbSet<Suppression> Suppressions => Set<Suppression>();
     public DbSet<ProviderEvent> ProviderEvents => Set<ProviderEvent>();
+    public DbSet<AgentRun> AgentRuns => Set<AgentRun>();
+    public DbSet<ApprovalRequest> Approvals => Set<ApprovalRequest>();
+    public DbSet<GuardAuditEntry> GuardAudit => Set<GuardAuditEntry>();
 
     public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
@@ -44,6 +48,9 @@ public sealed class RelayDbContext(DbContextOptions<RelayDbContext> options) : D
         modelBuilder.Entity<OutboxMessage>(ConfigureOutbox);
         modelBuilder.Entity<Suppression>(ConfigureSuppression);
         modelBuilder.Entity<ProviderEvent>(ConfigureProviderEvent);
+        modelBuilder.Entity<AgentRun>(ConfigureAgentRun);
+        modelBuilder.Entity<ApprovalRequest>(ConfigureApproval);
+        modelBuilder.Entity<GuardAuditEntry>(ConfigureGuardAudit);
 
         // Ids are created in code (Guid v7). Without this, EF treats a new child with a set key
         // (e.g. an appended MessageEvent) as an existing row and issues an UPDATE.
@@ -83,6 +90,9 @@ public sealed class RelayDbContext(DbContextOptions<RelayDbContext> options) : D
         b.Property(m => m.ProviderMessageId).HasMaxLength(300);
         b.HasIndex(m => m.InternetMessageId).IsUnique();
         b.HasIndex(m => m.ProviderMessageId);
+        b.Property(m => m.ContentHash).HasMaxLength(64).IsFixedLength();
+        b.HasIndex(m => m.AgentRunId);
+        b.HasIndex(m => new { m.TenantId, m.ContentHash });
 
         // Optimistic concurrency on PostgreSQL's xmin: two workers can never both write one message.
         b.Property<uint>("Version").IsRowVersion();
@@ -111,6 +121,42 @@ public sealed class RelayDbContext(DbContextOptions<RelayDbContext> options) : D
         b.HasIndex(o => o.MessageId).IsUnique();
         b.HasIndex(o => o.AvailableAt).HasFilter("processed_at IS NULL");
         b.HasOne<Message>().WithMany().HasForeignKey(o => o.MessageId);
+    }
+
+    private static readonly System.Text.Json.JsonSerializerOptions PolicyJson = new(System.Text.Json.JsonSerializerDefaults.Web);
+
+    private static void ConfigureAgentRun(EntityTypeBuilder<AgentRun> b)
+    {
+        b.Property(r => r.Name).HasMaxLength(200);
+        b.Property(r => r.Policy)
+            .HasColumnType("jsonb")
+            .HasConversion(
+                p => System.Text.Json.JsonSerializer.Serialize(p, PolicyJson),
+                s => System.Text.Json.JsonSerializer.Deserialize<GuardPolicy>(s, PolicyJson) ?? new GuardPolicy(),
+                new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<GuardPolicy>((a, c) => a == c, p => p.GetHashCode(), p => p));
+        b.HasIndex(r => r.TenantId);
+        b.HasOne<Tenant>().WithMany().HasForeignKey(r => r.TenantId);
+    }
+
+    private static void ConfigureApproval(EntityTypeBuilder<ApprovalRequest> b)
+    {
+        b.ToTable("approvals");
+        b.Property(a => a.Status).HasConversion<string>().HasMaxLength(16);
+        b.Property(a => a.Source).HasMaxLength(16);
+        b.Property(a => a.DecidedBy).HasMaxLength(100);
+        b.Property(a => a.Note).HasMaxLength(1000);
+        b.HasIndex(a => new { a.TenantId, a.Status, a.ExpiresAt });
+        b.HasOne<AgentRun>().WithMany().HasForeignKey(a => a.RunId);
+        b.HasOne<Message>().WithMany().HasForeignKey(a => a.MessageId);
+    }
+
+    private static void ConfigureGuardAudit(EntityTypeBuilder<GuardAuditEntry> b)
+    {
+        b.ToTable("guard_audit");
+        b.Property(a => a.Action).HasMaxLength(32);
+        b.Property(a => a.Actor).HasMaxLength(100);
+        b.HasIndex(a => new { a.RunId, a.At });
+        b.HasOne<AgentRun>().WithMany().HasForeignKey(a => a.RunId);
     }
 
     private static void ConfigureProviderEvent(EntityTypeBuilder<ProviderEvent> b)

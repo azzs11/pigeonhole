@@ -55,6 +55,10 @@ namespace Relay.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("revoked_at");
 
+                    b.Property<Guid?>("RunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("run_id");
+
                     b.PrimitiveCollection<string[]>("Scopes")
                         .IsRequired()
                         .HasColumnType("text[]")
@@ -83,6 +87,10 @@ namespace Relay.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<Guid?>("AgentRunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("agent_run_id");
+
                     b.PrimitiveCollection<string[]>("Bcc")
                         .IsRequired()
                         .HasColumnType("text[]")
@@ -92,6 +100,12 @@ namespace Relay.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text[]")
                         .HasColumnName("cc");
+
+                    b.Property<string>("ContentHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .HasColumnName("content_hash")
+                        .IsFixedLength();
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -172,12 +186,18 @@ namespace Relay.Infrastructure.Migrations
                     b.HasKey("Id")
                         .HasName("pk_messages");
 
+                    b.HasIndex("AgentRunId")
+                        .HasDatabaseName("ix_messages_agent_run_id");
+
                     b.HasIndex("InternetMessageId")
                         .IsUnique()
                         .HasDatabaseName("ix_messages_internet_message_id");
 
                     b.HasIndex("ProviderMessageId")
                         .HasDatabaseName("ix_messages_provider_message_id");
+
+                    b.HasIndex("TenantId", "ContentHash")
+                        .HasDatabaseName("ix_messages_tenant_id_content_hash");
 
                     b.HasIndex("TenantId", "Id")
                         .IsDescending(false, true)
@@ -319,6 +339,181 @@ namespace Relay.Infrastructure.Migrations
                         .HasDatabaseName("ix_tenants_name");
 
                     b.ToTable("tenants", (string)null);
+                });
+
+            modelBuilder.Entity("Relay.Guard.AgentRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Policy")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("policy");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.PrimitiveCollection<string[]>("TrustedRecipients")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("trusted_recipients");
+
+                    b.HasKey("Id")
+                        .HasName("pk_agent_runs");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_agent_runs_tenant_id");
+
+                    b.ToTable("agent_runs", (string)null);
+                });
+
+            modelBuilder.Entity("Relay.Guard.ApprovalRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at");
+
+                    b.Property<string>("DecidedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("decided_by");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("message_id");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("note");
+
+                    b.PrimitiveCollection<string[]>("Reasons")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("reasons");
+
+                    b.Property<int>("RiskScore")
+                        .HasColumnType("integer")
+                        .HasColumnName("risk_score");
+
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("run_id");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_approvals");
+
+                    b.HasIndex("MessageId")
+                        .HasDatabaseName("ix_approvals_message_id");
+
+                    b.HasIndex("RunId")
+                        .HasDatabaseName("ix_approvals_run_id");
+
+                    b.HasIndex("TenantId", "Status", "ExpiresAt")
+                        .HasDatabaseName("ix_approvals_tenant_id_status_expires_at");
+
+                    b.ToTable("approvals", (string)null);
+                });
+
+            modelBuilder.Entity("Relay.Guard.GuardAuditEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("action");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("actor");
+
+                    b.Property<Guid?>("ApprovalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approval_id");
+
+                    b.Property<DateTimeOffset>("At")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at");
+
+                    b.Property<Guid?>("MessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("message_id");
+
+                    b.PrimitiveCollection<string[]>("Reasons")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("reasons");
+
+                    b.Property<int>("RiskScore")
+                        .HasColumnType("integer")
+                        .HasColumnName("risk_score");
+
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("run_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_guard_audit");
+
+                    b.HasIndex("RunId", "At")
+                        .HasDatabaseName("ix_guard_audit_run_id_at");
+
+                    b.ToTable("guard_audit", (string)null);
                 });
 
             modelBuilder.Entity("Relay.Infrastructure.Persistence.OutboxMessage", b =>
@@ -465,6 +660,43 @@ namespace Relay.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_suppressions_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Relay.Guard.AgentRun", b =>
+                {
+                    b.HasOne("Relay.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_agent_runs_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Relay.Guard.ApprovalRequest", b =>
+                {
+                    b.HasOne("Relay.Domain.Message", null)
+                        .WithMany()
+                        .HasForeignKey("MessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_approvals_messages_message_id");
+
+                    b.HasOne("Relay.Guard.AgentRun", null)
+                        .WithMany()
+                        .HasForeignKey("RunId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_approvals_agent_runs_run_id");
+                });
+
+            modelBuilder.Entity("Relay.Guard.GuardAuditEntry", b =>
+                {
+                    b.HasOne("Relay.Guard.AgentRun", null)
+                        .WithMany()
+                        .HasForeignKey("RunId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_guard_audit_agent_runs_run_id");
                 });
 
             modelBuilder.Entity("Relay.Infrastructure.Persistence.OutboxMessage", b =>

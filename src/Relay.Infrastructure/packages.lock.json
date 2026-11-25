@@ -664,6 +664,12 @@
       "relay.domain": {
         "type": "Project"
       },
+      "relay.guard": {
+        "type": "Project",
+        "dependencies": {
+          "Relay.Application": "[1.0.0, )"
+        }
+      },
       "Microsoft.EntityFrameworkCore": {
         "type": "CentralTransitive",
         "requested": "[10.0.15, )",

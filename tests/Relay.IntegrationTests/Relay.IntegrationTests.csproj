@@ -25,6 +25,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Relay.Api\Relay.Api.csproj" />
+    <ProjectReference Include="..\..\src\Relay.Mcp\Relay.Mcp.csproj" Aliases="mcp" />
+    <ProjectReference Include="..\..\bench\AgentMailBench\AgentMailBench.csproj" Aliases="bench" />
   </ItemGroup>
 
 </Project>

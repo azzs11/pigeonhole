@@ -37,7 +37,11 @@ builder.Services
     .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(ApiKeyAuthenticationHandler.SchemeName, null);
 builder.Services.AddAuthorizationBuilder()
     .AddPolicy(Scopes.MessagesSend, p => p.RequireClaim(ApiKeyAuthenticationHandler.ScopeClaim, Scopes.MessagesSend))
-    .AddPolicy(Scopes.MessagesRead, p => p.RequireClaim(ApiKeyAuthenticationHandler.ScopeClaim, Scopes.MessagesRead));
+    .AddPolicy(Scopes.MessagesRead, p => p.RequireClaim(ApiKeyAuthenticationHandler.ScopeClaim, Scopes.MessagesRead))
+    .AddPolicy(Scopes.AgentsManage, p => p.RequireClaim(ApiKeyAuthenticationHandler.ScopeClaim, Scopes.AgentsManage))
+    .AddPolicy(Scopes.AgentSend, p => p
+        .RequireClaim(ApiKeyAuthenticationHandler.ScopeClaim, Scopes.AgentSend)
+        .RequireClaim(ApiKeyAuthenticationHandler.RunClaim));
 
 var app = builder.Build();
 
@@ -59,5 +63,6 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy" })).AllowAnonymo
 app.MapMessageEndpoints();
 app.MapSuppressionEndpoints();
 app.MapWebhookEndpoints();
+app.MapAgentEndpoints();
 
 await app.RunAsync();
