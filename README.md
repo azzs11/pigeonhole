@@ -6,8 +6,9 @@
 Durable, idempotent email delivery for .NET, with provider failover and an
 **Agent Send Guard** that lets AI agents send mail safely.
 
-> **Status: Phase 1 of 8.** Messages are accepted durably into PostgreSQL with an
-> outbox row, but are **not sent yet**. Real delivery arrives in Phase 2. Nothing
+> **Status: Phase 2 of 8.** Messages are accepted durably and delivered by a worker
+> through SMTP (MailKit), Resend or SES, with retries, failover and an Unknown state
+> for ambiguous outcomes. Bounce handling arrives in Phase 3. Nothing
 > below is a measured claim until a benchmark result in `bench/results/` backs it.
 
 ## What it is (and is not)
@@ -26,9 +27,10 @@ Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download) (pinned in
 `global.json`) and Docker.
 
 ```bash
-docker compose -f deploy/docker-compose.yml up -d           # PostgreSQL on :5433
+docker compose -f deploy/docker-compose.yml up -d           # PostgreSQL :5433, Mailpit :1025 / UI :8025
 dotnet run --project tools/Relay.Cli -- keys create --tenant demo   # prints a key once
 dotnet run --project src/Relay.Api                           # http://localhost:5238, docs at /docs
+dotnet run --project src/Relay.Worker                        # delivers to Mailpit; open http://localhost:8025
 
 curl -H "Authorization: Bearer <key>" -H "Idempotency-Key: demo-1" \
      -H "Content-Type: application/json" \
@@ -51,9 +53,9 @@ dotnet test   # unit, architecture, and integration tests (integration needs Doc
 |---|---|
 | `Relay.Domain` | Entities and the delivery state machine. References nothing. |
 | `Relay.Application` | Use cases and ports. Depends only on Domain. |
-| `Relay.Infrastructure` | Persistence, outbox, provider adapters (Phases 1–2). |
+| `Relay.Infrastructure` | EF Core + PostgreSQL, outbox, SMTP/Resend/SES adapters, resilience. |
 | `Relay.Api` | HTTP API. |
-| `Relay.Worker` | Outbox relay and schedulers (Phase 2). |
+| `Relay.Worker` | Outbox relay: claims with SKIP LOCKED, sends, records outcomes. Run as many as you like. |
 | `Relay.Guard` | Agent Send Guard policy engine (Phase 5). |
 | `Relay.Mcp` | MCP server exposing the Guard (Phase 5). |
 | `tools/Relay.Cli` | Operator CLI: migrations, create and revoke API keys. |
@@ -64,8 +66,8 @@ they don't.
 ## Roadmap
 
 0. Clean repo, .NET 10, CI
-1. Durable core (PostgreSQL, transactional accept, idempotency keys) and security fixes ← *you are here*
-2. Delivery engine: outbox relay, providers, retries, failover
+1. Durable core (PostgreSQL, transactional accept, idempotency keys) and security fixes
+2. Delivery engine: outbox relay, providers, retries, failover ← *you are here*
 3. Webhooks, suppression, atomic quotas
 4. Observability and **MailChaos**, a failure-injection benchmark
 5. Agent Send Guard, MCP server and **AgentMailBench**
