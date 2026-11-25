@@ -54,3 +54,75 @@ jobs:
           name: test-results
           path: TestResults
           retention-days: 7
+
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc -b
+      - name: Component tests
+        run: npm test
+
+  e2e:
+    # Full stack: PostgreSQL + Mailpit (compose), the API and a worker in Development (sandbox on), the built dashboard.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [build-test, web]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Start PostgreSQL and Mailpit
+        run: docker compose -f deploy/docker-compose.yml up -d --wait postgres mailpit
+
+      - name: Build
+        run: dotnet build Relay.slnx
+
+      - name: Start API and worker
+        run: |
+          ASPNETCORE_ENVIRONMENT=Development nohup dotnet run --no-build --project src/Relay.Api --launch-profile http > api.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://localhost:5238/health && break; sleep 1; done
+          DOTNET_ENVIRONMENT=Development nohup dotnet run --no-build --project src/Relay.Worker > worker.log 2>&1 &
+
+      - name: Install dashboard and browser
+        working-directory: web
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Playwright flow and accessibility checks
+        working-directory: web
+        run: npm run e2e
+
+      - name: Upload report and logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-report
+          path: |
+            web/playwright-report
+            api.log
+            worker.log
+          retention-days: 7
