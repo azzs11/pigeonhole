@@ -6,10 +6,29 @@
 Durable, idempotent email delivery for .NET, with provider failover and an
 **Agent Send Guard** that lets AI agents send mail safely.
 
-> **Status: Phase 3 of 8.** Durable accept, delivery through SMTP, Resend or SES with
-> failover, signed provider webhooks, bounce and complaint suppression, atomic daily
-> quotas, rate limits and an automatic reputation pause. Nothing
+> **Status: Phase 4 of 8.** Durable accept, delivery through SMTP, Resend or SES with
+> failover, signed provider webhooks, suppression, atomic quotas, a reputation pause,
+> OpenTelemetry traces and metrics, and the MailChaos benchmark below. Nothing
 > below is a measured claim until a benchmark result in `bench/results/` backs it.
+
+## Headline results: MailChaos
+
+MailChaos kills workers mid-send, times out the provider after (and before) it accepts,
+cuts the provider off, restarts the database and duplicates webhooks, then counts
+what was lost or sent twice. Method: [docs/benchmarks/mailchaos.md](docs/benchmarks/mailchaos.md).
+This table is generated from `bench/results/mailchaos/results.json` by `bench/run-mailchaos.sh`.
+
+<!-- mailchaos:start -->
+Duplicates / lost per 10,000 messages (2,000 per run, seed 42, commit `766c6ff-dirty`, generated 2026-11-25). Fault rate is per provider call.
+
+| System | 0% faults | 1% faults | 2% faults | 5% faults | 10% faults |
+|---|---|---|---|---|---|
+| naive send-then-save | 0 / 0 | 55 / 0 | 105 / 0 | 310 / 0 | 485 / 0 |
+| outbox only | 0 / 0 | 55 / 0 | 105 / 0 | 305 / 0 | 495 / 0 |
+| outbox + unknown state | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 |
+
+![MailChaos results](bench/results/mailchaos/mailchaos.png)
+<!-- mailchaos:end -->
 
 ## What it is (and is not)
 
@@ -47,6 +66,10 @@ In Development the API applies migrations on startup. Elsewhere, run
 dotnet test   # unit, architecture, and integration tests (integration needs Docker)
 ```
 
+Observability (optional): `docker compose -f deploy/docker-compose.yml --profile observability up -d`
+starts Prometheus (:9090), Jaeger (:16686) and Grafana (:3001, "Relay overview" dashboard).
+`GET /v1/messages/{id}/explain` describes every state change in plain language.
+
 ## Layout
 
 | Project | Role |
@@ -68,8 +91,8 @@ they don't.
 0. Clean repo, .NET 10, CI
 1. Durable core (PostgreSQL, transactional accept, idempotency keys) and security fixes
 2. Delivery engine: outbox relay, providers, retries, failover
-3. Webhooks, suppression, atomic quotas ← *you are here*
-4. Observability and **MailChaos**, a failure-injection benchmark
+3. Webhooks, suppression, atomic quotas
+4. Observability and **MailChaos**, a failure-injection benchmark ← *you are here*
 5. Agent Send Guard, MCP server and **AgentMailBench**
 6. Dashboard
 7. Docs, one-command demo, v1.0.0
