@@ -1,23 +1,68 @@
-# Pigeonhole
+<p align="center">
+  <img src="docs/images/landing.png" alt="The Pigeonhole landing page: a big headline reading Every letter. One pigeonhole., a Try the sandbox button and a wall of pigeonholes with coloured envelopes" width="880">
+</p>
 
-[![ci](https://github.com/azzs11/pigeonhole/actions/workflows/ci.yml/badge.svg)](https://github.com/azzs11/pigeonhole/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+<h1 align="center">Pigeonhole</h1>
 
-**Pigeonhole** is durable, idempotent email delivery for .NET, with provider failover and an
-**Agent Send Guard** that lets AI agents send mail safely. The code name is *Relay*: the .NET
-projects are `Relay.*`. In a postal sorting office, every letter ends up in exactly one pigeonhole.
+<p align="center">
+  <b>Email that arrives once. Not zero times, not twice. Once.</b><br>
+  A delivery service for .NET, with a guard dog for AI agents that want to send mail.
+</p>
 
-> **Status: Phase 6 of 8.** Durable, idempotent delivery with failover, signed provider
-> webhooks, suppression, quotas, OpenTelemetry, MailChaos, the **Agent Send Guard** with an MCP
-> server and AgentMailBench, and the sorting-office dashboard. Nothing
-> below is a measured claim until a benchmark result in `bench/results/` backs it.
+<p align="center">
+  <a href="https://github.com/azzs11/pigeonhole/actions/workflows/ci.yml"><img src="https://github.com/azzs11/pigeonhole/actions/workflows/ci.yml/badge.svg" alt="ci"></a>
+  <a href="https://github.com/azzs11/pigeonhole/releases"><img src="https://img.shields.io/github/v/release/azzs11/pigeonhole?label=release" alt="release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT"></a>
+</p>
 
-## Headline results: MailChaos
+---
 
-MailChaos kills workers mid-send, times out the provider after (and before) it accepts,
-cuts the provider off, restarts the database and duplicates webhooks, then counts
-what was lost or sent twice. Method: [docs/benchmarks/mailchaos.md](docs/benchmarks/mailchaos.md).
-This table is generated from `bench/results/mailchaos/results.json` by `bench/run-mailchaos.sh`.
+## The problem, in three sentences
+
+Email has no "exactly once": if your app crashes between *the provider said OK* and *we wrote
+that down*, you either lose the message or send it again. Most code picks "send it again"
+without noticing, and your customer gets two password resets. Put an AI agent on the send
+button and it gets worse: agents retry, loop, and occasionally get talked into mailing your
+data to a stranger.
+
+Pigeonhole is a sorting office for that problem. Every letter is written down before anyone
+says "accepted", handed to a provider by exactly one worker, and when nobody can tell whether
+it went out, it goes in a bin labelled **Unknown** instead of being sent twice.
+
+<p align="center">
+  <img src="docs/images/demo.gif" alt="Animated demo: open the sandbox, send a batch of 200, watch the counters climb and drain into Delivered, then open one message's timeline" width="880">
+</p>
+
+## Try it (one command)
+
+You need Docker. That's it.
+
+```bash
+git clone https://github.com/azzs11/pigeonhole && cd pigeonhole
+docker compose up
+```
+
+| Door | What's behind it |
+|---|---|
+| <http://localhost:5173> | The dashboard. Click **Try the sandbox**: no key, no signup. |
+| <http://localhost:5173/docs> | The API reference (Scalar). |
+| <http://localhost:8025> | The test inbox (Mailpit). Everything "sent" lands here and nowhere else. |
+
+The sandbox hands you a throwaway API key with its own tenant and a 200-a-day quota. It
+won't send real mail: in sandbox mode the worker refuses to start with any API provider (SES,
+Resend), and compose points its only SMTP provider at Mailpit. `deploy/smoke.sh` checks the
+whole path (demo key, one send, exactly one letter in the inbox), and CI runs it on every push.
+
+## The numbers
+
+Every figure below is produced by a script in `bench/` and pasted in by that script. Nothing is
+typed by hand.
+
+### MailChaos: does anything get lost or sent twice?
+
+MailChaos sabotages delivery on purpose. It kills workers mid-send, times out the provider
+just *after* it accepted, cuts the network, restarts the database and replays webhooks. Then
+it counts. Method: [docs/benchmarks/mailchaos.md](docs/benchmarks/mailchaos.md).
 
 <!-- mailchaos:start -->
 Duplicates / lost per 10,000 messages (2,000 per run, seed 42, commit `766c6ff-dirty`, generated 2026-11-25). Fault rate is per provider call.
@@ -31,12 +76,15 @@ Duplicates / lost per 10,000 messages (2,000 per run, seed 42, commit `766c6ff-d
 ![MailChaos results](bench/results/mailchaos/mailchaos.png)
 <!-- mailchaos:end -->
 
-## Headline results: AgentMailBench
+Read the middle row twice. An outbox alone, the textbook fix, still duplicates: it retries
+anything that timed out, including sends that already went through. The **Unknown** state is
+what brings duplicates to zero.
 
-Scripted agent tool calls (benign tasks, prompt-injection exfiltration, retry storms,
-runaway blasts) replayed against four Guard configurations. Method:
-[docs/benchmarks/agentmailbench.md](docs/benchmarks/agentmailbench.md). What the Guard does
-not defend against: [docs/threat-model.md](docs/threat-model.md).
+### AgentMailBench: can an agent be talked into misbehaving?
+
+150 scripted agent sessions: ordinary tasks, prompt-injected exfiltration, retry storms and
+runaway blasts, replayed against four Guard configurations. Method:
+[docs/benchmarks/agentmailbench.md](docs/benchmarks/agentmailbench.md).
 
 <!-- agentmailbench:start -->
 150 scenarios (60 Benign, 40 Exfiltration, 25 RetryStorm, 25 RunawayBlast), seed 7, commit `99bb16f-dirty`, generated 2026-11-25. 4 attack scenarios are known limitations the Guard is not designed to stop; they stay in the denominator.
@@ -49,101 +97,144 @@ not defend against: [docs/threat-model.md](docs/threat-model.md).
 | full guard | 95.6% (86/90) | 0.0% | 0.0% | 3.2 ms |
 <!-- agentmailbench:end -->
 
-## What it is (and is not)
+The four it misses are on purpose: they are attacks the Guard is not designed to stop, and
+[docs/threat-model.md](docs/threat-model.md) names each one. A guard that claims 100% is
+hiding its misses.
 
-- **Is:** a delivery service that accepts a message, stores it durably, and
-  sends it through SMTP or an API provider (MailKit, SES, Resend), with
-  retries, failover and bounce-aware suppression.
-- **Is:** a policy layer and MCP server so AI agents can send mail only
-  inside rules you set (allowed recipients, caps, dedupe, human approval).
-- **Is not:** a mail server. It does not replace Postfix, receive inbound
-  mail, or run marketing campaigns.
+## A tour of the sorting office
 
-## Quick start
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/sorting-office.png" alt="The sorting office: a floor plan with Intake, Agent guard and Sorting rooms, the providers, and the Delivered, Returned, Unknown and Dead letter bins, plus coloured counter tiles, the sabotage panel and the promises panel"></td>
+    <td width="50%"><img src="docs/images/sorting-office-dark.png" alt="The same floor plan in dark mode"></td>
+  </tr>
+  <tr>
+    <td><b>The floor plan.</b> Letters travel from Intake through the Agent Guard and the outbox to a provider, then into a bin. The sabotage panel lets you switch providers off, slow them down or crash the worker mid-send. Three promises are checked live against what actually reached the inbox.</td>
+    <td><b>After hours.</b> Same office, lights off. Both themes pass an axe accessibility scan on every page in CI.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/approvals.png" alt="Approvals: a held message with its risk score, the reason it was held, and Approve and Reject buttons"></td>
+    <td><img src="docs/images/messages.png" alt="Messages: a table of messages with stamp-shaped status badges"></td>
+  </tr>
+  <tr>
+    <td><b>Approvals.</b> An agent tried to mail someone its run never mentioned. The Guard held it and says why in one sentence. Press <kbd>A</kbd> or <kbd>R</kbd>.</td>
+    <td><b>Messages.</b> Every letter carries a stamp, and clicking one opens its full life story: accepted, claimed, handed over, delivered or returned.</td>
+  </tr>
+</table>
 
-Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download) (pinned in
-`global.json`) and Docker.
+## How a letter travels
 
-```bash
-docker compose -f deploy/docker-compose.yml up -d           # PostgreSQL :5433, Mailpit :1025 / UI :8025
-dotnet run --project tools/Relay.Cli -- keys create --tenant demo   # prints a key once
-dotnet run --project src/Relay.Api                           # http://localhost:5238, docs at /docs
-dotnet run --project src/Relay.Worker                        # delivers to Mailpit; open http://localhost:8025
-
-curl -H "Authorization: Bearer <key>" -H "Idempotency-Key: demo-1" \
-     -H "Content-Type: application/json" \
-     -d '{"to":["r@example.test"],"subject":"Hi","text":"Hello"}' \
-     http://localhost:5238/v1/messages
+```mermaid
+flowchart LR
+  A[Your app] -- "POST /v1/messages<br/>Idempotency-Key" --> API
+  G[AI agent] -- MCP --> MCP[Relay.Mcp] --> Guard{{Agent Send Guard}} --> API
+  API -- "one transaction" --> DB[(PostgreSQL<br/>message + outbox)]
+  DB -- "FOR UPDATE SKIP LOCKED<br/>+ lease" --> W[Worker × N]
+  W --> P1[SMTP] & P2[Resend] & P3[SES]
+  P1 & P2 & P3 -. "signed webhooks" .-> API
 ```
 
-In Development the API applies migrations on startup. Elsewhere, run
-`relay db migrate`. More requests are in
-[`src/Relay.Api/Relay.Api.http`](src/Relay.Api/Relay.Api.http). Design decisions are in
-[`docs/adr/`](docs/adr/).
+The state machine every message lives by:
 
-```bash
-dotnet test   # unit, architecture, and integration tests (integration needs Docker)
+```mermaid
+stateDiagram-v2
+  [*] --> Accepted
+  Accepted --> Held: Guard wants a human
+  Accepted --> Rejected: suppressed or refused
+  Held --> Accepted: approved
+  Held --> Rejected: rejected or expired
+  Accepted --> Sending: a worker claims it
+  Sending --> Sent: provider said yes
+  Sending --> Accepted: not sent, retry or fail over
+  Sending --> Unknown: provider might have sent it
+  Sending --> DeadLettered: out of retries
+  Unknown --> Sent: reconciled
+  Unknown --> Accepted: safe to retry
+  Unknown --> DeadLettered: gave up
+  Sent --> Delivered
+  Sent --> Bounced: hard bounce
+  Sent --> Accepted: soft bounce, retry later
 ```
 
-Observability (optional): `docker compose -f deploy/docker-compose.yml --profile observability up -d`
-starts Prometheus (:9090), Jaeger (:16686) and Grafana (:3001, "Relay overview" dashboard).
-`GET /v1/messages/{id}/explain` describes every state change in plain language.
+**Why Unknown exists.** A timeout after the request left your machine is not a failure. It's
+a shrug. Retrying a shrug is how people get two invoices. So a timeout never fails over to
+another provider. If the provider deduplicates (Resend's idempotency key), the message is
+retried on that provider only. Otherwise it waits for the provider's webhook or for a human.
+Every attempt carries the same `Message-ID`, so the webhook can find its letter.
+[ADR 0004](docs/adr/0004-delivery-outcomes-and-unknown-state.md) has the details.
 
-### Dashboard
+## Send something
 
 ```bash
-cd web && npm install && npm run dev        # http://localhost:5173 (proxies /v1 to the API on :5238)
+curl http://localhost:5173/v1/messages \
+  -H "Authorization: Bearer $KEY" \
+  -H "Idempotency-Key: welcome-42" \
+  -H "Content-Type: application/json" \
+  -d '{"to":["maya@example.test"],"subject":"Welcome","text":"Glad you are here."}'
 ```
 
-Paste an API key to open the **sorting office**: a floor plan where messages flow from Intake
-through the Agent Guard and the outbox to the providers and into the Delivered, Returned,
-Unknown or Dead letter bins. In Development the **sandbox** is on. You can send a test batch,
-switch providers off, slow them down, or crash the worker after a send, and watch the three
-promises (nothing sent twice, nothing lost, everything explained) stay green, checked against
-what actually reached Mailpit. Other pages: Messages (a timeline of every state change),
-Approvals (A to approve, R to reject), Suppressions, Providers (live circuit state), Chaos run
-(the MailChaos results) and Settings. The API client is generated from the OpenAPI document
-(`web/scripts/gen-api.sh`). Tests: `npm test` (components), `npm run e2e` (Playwright flow plus an
-axe check of every page in light and dark mode; it needs the API, the worker and compose running).
+Send it again with the same key and you get the same message back, not a second email. For a
+`$KEY`, run `curl -X POST http://localhost:5173/v1/sandbox/demo-key` (sandbox) or
+`dotnet run --project tools/Relay.Cli -- keys create --tenant demo` (any setup).
 
-### Connect an AI agent (MCP)
+### Give an agent a mailbox (MCP)
 
 ```bash
 dotnet run --project tools/Relay.Cli -- runs create --tenant demo --trusted maya@example.test
-# prints a run token (shown once) and a ready `claude mcp add relay ...` command
+# prints a run token (shown once) and a ready-made `claude mcp add relay ...` line
 ```
 
-The agent gets `send_email`, `list_sent`, `get_status` and `request_approval`. Every call passes
-the Agent Send Guard. Mail to addresses the run didn't name is held for a human
-(`GET /v1/approvals`, then `POST /v1/approvals/{id}/approve` or `/reject`).
+The agent gets `send_email`, `list_sent`, `get_status` and `request_approval`. Every call goes
+through the Guard, which checks:
 
-## Layout
+- **Provenance:** was this recipient named on the run, or did it come from text the agent read?
+- **Secrets:** API keys, private keys, card numbers and the like in the body.
+- **Duplicates:** the same content to the same person within 24 hours.
+- **Caps:** recipients per message, per run, per hour, per person per day.
 
-| Project | Role |
+The run token cannot approve its own held mail.
+
+## What it is not
+
+- **Not a mail server.** It doesn't replace Postfix or receive mail. It sends through SMTP and
+  API providers (MailKit, SES, Resend).
+- **Not a newsletter tool.** No campaigns, templates or unsubscribe pages.
+- **Not a proof of agent safety.** The Guard is defence in depth. Read the
+  [threat model](docs/threat-model.md) before you trust it with anything spicy.
+
+## Run it the long way (for hacking on it)
+
+```bash
+docker compose -f deploy/docker-compose.yml up -d        # PostgreSQL :5433, Mailpit :1025 / :8025
+dotnet run --project src/Relay.Api                       # :5238, sandbox on in Development
+dotnet run --project src/Relay.Worker                    # delivers to Mailpit
+cd web && npm install && npm run dev                     # :5173, click "Try the sandbox"
+```
+
+Tests: `dotnet test` (unit, architecture and integration with Testcontainers), `npm test` and
+`npm run e2e` in `web/` (Playwright flow plus axe in light and dark). Benchmarks:
+`bench/run-mailchaos.sh` and `bench/run-agentmailbench.sh` regenerate the tables above.
+
+## Where things live
+
+| | |
 |---|---|
-| `Relay.Domain` | Entities and the delivery state machine. References nothing. |
-| `Relay.Application` | Use cases and ports. Depends only on Domain. |
-| `Relay.Infrastructure` | EF Core + PostgreSQL, outbox, SMTP/Resend/SES adapters, resilience. |
-| `Relay.Api` | HTTP API. |
-| `Relay.Worker` | Outbox relay: claims with SKIP LOCKED, sends, records outcomes. Run as many as you like. |
-| `Relay.Guard` | Agent Send Guard policy engine (Phase 5). |
-| `Relay.Mcp` | MCP server exposing the Guard (Phase 5). |
-| `tools/Relay.Cli` | Operator CLI: migrations, create and revoke API keys. |
+| `src/Relay.Domain` | The state machine. References nothing. |
+| `src/Relay.Application` | Use cases and ports. |
+| `src/Relay.Infrastructure` | PostgreSQL, the outbox, provider adapters, Polly resilience, webhooks. |
+| `src/Relay.Api` / `Relay.Worker` | The front counter and the people in the back. Run as many workers as you like. |
+| `src/Relay.Guard` / `Relay.Mcp` | The Agent Send Guard and its MCP client. |
+| `web/` | The dashboard (React 19, Vite, TanStack Query, Tailwind 4). |
+| `bench/` | MailChaos and AgentMailBench. |
+| `docs/` | [Architecture](docs/architecture.md), [runbook](docs/runbook.md), [ADRs](docs/adr/), [threat model](docs/threat-model.md). |
 
-Dependencies point inward. `tests/Relay.ArchitectureTests` fails the build if
-they don't.
+Built on .NET 10, PostgreSQL 17, EF Core, Polly 8, MailKit, OpenTelemetry, Serilog and Mailpit.
+Dependencies point inward, and an architecture test fails the build if they don't.
 
-## Roadmap
+## Contributing
 
-0. Clean repo, .NET 10, CI
-1. Durable core (PostgreSQL, transactional accept, idempotency keys) and security fixes
-2. Delivery engine: outbox relay, providers, retries, failover
-3. Webhooks, suppression, atomic quotas
-4. Observability and **MailChaos**, a failure-injection benchmark
-5. Agent Send Guard, MCP server and **AgentMailBench**
-6. Dashboard ← *you are here*
-7. Docs, one-command demo, v1.0.0
+Small, focused pull requests with Conventional Commit messages. See
+[CONTRIBUTING.md](CONTRIBUTING.md). Found a hole? [SECURITY.md](SECURITY.md) says where to send it.
 
-## License
-
-[MIT](LICENSE)
+[MIT](LICENSE). In a real sorting office every letter ends up in exactly one pigeonhole.
+That's the whole idea.
