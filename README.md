@@ -6,9 +6,9 @@
 Durable, idempotent email delivery for .NET, with provider failover and an
 **Agent Send Guard** that lets AI agents send mail safely.
 
-> **Status: Phase 2 of 8.** Messages are accepted durably and delivered by a worker
-> through SMTP (MailKit), Resend or SES, with retries, failover and an Unknown state
-> for ambiguous outcomes. Bounce handling arrives in Phase 3. Nothing
+> **Status: Phase 3 of 8.** Durable accept, delivery through SMTP, Resend or SES with
+> failover, signed provider webhooks, bounce and complaint suppression, atomic daily
+> quotas, rate limits and an automatic reputation pause. Nothing
 > below is a measured claim until a benchmark result in `bench/results/` backs it.
 
 ## What it is (and is not)
@@ -67,8 +67,8 @@ they don't.
 
 0. Clean repo, .NET 10, CI
 1. Durable core (PostgreSQL, transactional accept, idempotency keys) and security fixes
-2. Delivery engine: outbox relay, providers, retries, failover ← *you are here*
-3. Webhooks, suppression, atomic quotas
+2. Delivery engine: outbox relay, providers, retries, failover
+3. Webhooks, suppression, atomic quotas ← *you are here*
 4. Observability and **MailChaos**, a failure-injection benchmark
 5. Agent Send Guard, MCP server and **AgentMailBench**
 6. Dashboard

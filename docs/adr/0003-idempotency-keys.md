@@ -10,7 +10,8 @@ same email twice.
 
 ## Decision
 
-- `Idempotency-Key` is optional, 1–255 printable ASCII characters, and unique per tenant.
+- `Idempotency-Key` is optional, 1–200 printable ASCII characters excluding `#`, and unique per tenant.
+  A bulk request stores `{key}#{index}` on each of its messages and replays as one unit.
   A unique index on `(tenant_id, idempotency_key)` enforces this.
 - The request is normalised (default sender applied) and hashed with SHA-256. The hash
   is stored with the message.
