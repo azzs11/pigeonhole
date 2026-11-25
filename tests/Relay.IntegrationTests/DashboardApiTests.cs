@@ -105,3 +105,68 @@ public class OpenApiTests(RelayFixture fixture)
         }
     }
 }
+
+[Collection(RelayTestGroup.Name)]
+public class SandboxDemoTests(RelayFixture fixture)
+{
+    [Fact]
+    public async Task Sandbox_issues_a_working_demo_key_with_its_own_small_quota()
+    {
+        await using var sandbox = new RelayApiFactory(fixture.ConnectionString, new Dictionary<string, string?>
+        {
+            ["Relay:Sandbox:Enabled"] = "true",
+            ["Relay:Sandbox:DemoDailyQuota"] = "50",
+        });
+        var anonymous = sandbox.CreateClient();
+
+        (await anonymous.GetStringAsync("/v1/sandbox")).ShouldContain("\"enabled\":true");
+        var response = await anonymous.PostAsync(new Uri("/v1/sandbox/demo-key", UriKind.Relative), null);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Created);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var client = sandbox.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new("Bearer", body.RootElement.GetProperty("key").GetString());
+        using var stats = JsonDocument.Parse(await client.GetStringAsync("/v1/stats"));
+        stats.RootElement.GetProperty("dailyQuota").GetInt32().ShouldBe(50);
+        (await client.GetAsync("/v1/approvals")).StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Demo_key_limit_is_per_visitor_behind_the_trusted_proxy()
+    {
+        await using var sandbox = new RelayApiFactory(fixture.ConnectionString, new Dictionary<string, string?>
+        {
+            ["Relay:Sandbox:Enabled"] = "true",
+            ["Relay:RateLimit:DemoKeysPerHour"] = "1",
+            ["Relay:Proxy:KnownNetworks:0"] = "127.0.0.0/8",
+            ["Relay:Proxy:KnownNetworks:1"] = "::1/128",
+        });
+        var client = sandbox.CreateClient();
+
+        async Task<HttpStatusCode> AskAs(string ip)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/sandbox/demo-key");
+            request.Headers.Add("X-Forwarded-For", ip);
+            return (await client.SendAsync(request)).StatusCode;
+        }
+
+        (await AskAs("203.0.113.10")).ShouldBe(HttpStatusCode.Created);
+        (await AskAs("203.0.113.10")).ShouldBe(HttpStatusCode.TooManyRequests);
+        (await AskAs("203.0.113.11")).ShouldBe(HttpStatusCode.Created);
+    }
+
+    [Fact]
+    public async Task Demo_keys_do_not_exist_outside_the_sandbox() =>
+        (await fixture.ClientWithKey(null).PostAsync(new Uri("/v1/sandbox/demo-key", UriKind.Relative), null))
+            .StatusCode.ShouldBe(HttpStatusCode.NotFound);
+
+    [Fact]
+    public void Sandbox_refuses_real_providers()
+    {
+        var sandbox = new SandboxOptions { Enabled = true };
+        Should.NotThrow(() => sandbox.EnsureSinkOnly([new ProviderSettings { Name = "mailpit", Type = ProviderType.Smtp }]));
+        Should.Throw<InvalidOperationException>(() => sandbox.EnsureSinkOnly([new ProviderSettings { Name = "resend", Type = ProviderType.Resend }]))
+            .Message.ShouldContain("resend");
+        Should.NotThrow(() => new SandboxOptions().EnsureSinkOnly([new ProviderSettings { Name = "ses", Type = ProviderType.Ses }]));
+    }
+}

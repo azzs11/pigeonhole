@@ -55,6 +55,7 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
     await scope.ServiceProvider.GetRequiredService<RelayDbContext>().Database.MigrateAsync();
 }
 
+app.UseRelayForwardedHeaders(app.Configuration);
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseAuthentication();

@@ -24,6 +24,27 @@ public sealed record SandboxOptions
 
     /// <summary>Mailpit's API, used to check "nothing sent twice" against what actually arrived.</summary>
     public Uri? MailpitApi { get; init; }
+
+    /// <summary>Mailpit's web UI as the visitor's browser sees it (MailpitApi may be a container-internal address).</summary>
+    public Uri? MailpitPublicUrl { get; init; }
+
+    /// <summary>Recipients per day for self-service demo keys. Small on purpose.</summary>
+    public int DemoDailyQuota { get; init; } = 200;
+
+    /// <summary>
+    /// The sandbox must never send real mail: only SMTP providers (the Mailpit sink) are allowed.
+    /// Called by the worker at startup.
+    /// </summary>
+    public void EnsureSinkOnly(IEnumerable<Delivery.ProviderSettings> providers)
+    {
+        ArgumentNullException.ThrowIfNull(providers);
+        var real = providers.Where(p => p.Type != Delivery.ProviderType.Smtp).Select(p => p.Name).ToList();
+        if (Enabled && real.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Sandbox mode only allows SMTP sink providers (Mailpit); refusing to start with: {string.Join(", ", real)}.");
+        }
+    }
 }
 
 public sealed class SandboxCrashException : Exception
@@ -119,6 +140,17 @@ public sealed class SandboxService(
         s.UpdatedAt = time.GetUtcNow();
         await db.SaveChangesAsync(cancellationToken);
         return new SwitchesDto(s.DownProviders, s.DelayMilliseconds, s.CrashRate);
+    }
+
+    /// <summary>A throwaway tenant and key for a visitor: own data, tiny quota, all scopes.</summary>
+    public async Task<IssuedKey> IssueDemoKeyAsync(ApiKeyService keys, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        var issued = await keys.IssueAsync($"demo-{Guid.NewGuid():N}"[..17], "sandbox demo", Scopes.All, cancellationToken);
+        var tenant = await db.Tenants.SingleAsync(t => t.Id == issued.Key.TenantId, cancellationToken);
+        tenant.SetDailyQuota(options.DemoDailyQuota);
+        await db.SaveChangesAsync(cancellationToken);
+        return issued;
     }
 
     public Task<SendOutcome> SendBatchAsync(Guid tenantId, int count, CancellationToken cancellationToken) =>

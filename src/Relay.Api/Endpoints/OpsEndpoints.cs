@@ -13,13 +13,15 @@ internal static class OpsEndpoints
     {
         app.MapGet("/v1/stats", Stats).WithTags("Dashboard").RequireAuthorization(Scopes.MessagesRead);
         app.MapGet("/v1/providers", Providers).WithTags("Dashboard").RequireAuthorization(Scopes.MessagesRead);
-        app.MapGet("/v1/sandbox", () => TypedResults.Ok(new SandboxInfo(sandbox.Enabled, sandbox.MailpitApi?.ToString())))
-            .WithTags("Sandbox").RequireAuthorization(Scopes.MessagesRead);
+        // Anonymous so the sign-in page can offer the demo; it reveals only whether the sandbox is on.
+        app.MapGet("/v1/sandbox", () => TypedResults.Ok(new SandboxInfo(sandbox.Enabled, (sandbox.MailpitPublicUrl ?? sandbox.MailpitApi)?.ToString())))
+            .WithTags("Sandbox").AllowAnonymous();
         if (!sandbox.Enabled)
         {
             return;
         }
 
+        app.MapPost("/v1/sandbox/demo-key", DemoKey).WithTags("Sandbox").AllowAnonymous().RequireRateLimiting(RateLimiting.DemoKeyPolicy);
         var group = app.MapGroup("/v1/sandbox").WithTags("Sandbox").RequireAuthorization(Scopes.MessagesSend);
         group.MapGet("/switches", (SandboxService s, CancellationToken ct) => s.GetSwitchesAsync(ct));
         group.MapPut("/switches", (SwitchesDto body, SandboxService s, CancellationToken ct) => s.SetSwitchesAsync(body, ct));
@@ -33,6 +35,13 @@ internal static class OpsEndpoints
 
     private static async Task<Ok<IReadOnlyList<ProviderHealth>>> Providers(OpsQueries ops, CancellationToken cancellationToken) =>
         TypedResults.Ok(await ops.ProvidersAsync(cancellationToken));
+
+    private static async Task<Created<DemoKeyResult>> DemoKey(SandboxService sandbox, ApiKeyService keys, CancellationToken cancellationToken)
+    {
+        var issued = await sandbox.IssueDemoKeyAsync(keys, cancellationToken);
+        return TypedResults.Created((string?)null, new DemoKeyResult(issued.Plaintext, issued.Key.Prefix,
+            "A throwaway sandbox key: its own tenant, a small daily quota, and mail only ever reaches the test inbox."));
+    }
 
     private static async Task<Results<Accepted<BatchResult>, ProblemHttpResult>> Batch(
         BatchRequest request, ClaimsPrincipal user, SandboxService sandbox, CancellationToken cancellationToken) =>
@@ -58,3 +67,5 @@ internal sealed record BatchRequest(int Count = 200);
 internal sealed record BatchResult(int Accepted);
 
 internal sealed record BounceResult(string Result);
+
+internal sealed record DemoKeyResult(string Key, string Prefix, string Note);

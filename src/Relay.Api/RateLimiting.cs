@@ -16,14 +16,22 @@ internal sealed record RateLimitOptions
     /// <summary>Per client IP for unauthenticated requests (webhooks, bad keys).</summary>
     public int AnonymousPermitsPerSecond { get; init; } = 20;
     public int AnonymousBurst { get; init; } = 40;
+
+    /// <summary>Self-service sandbox demo keys per client IP per hour.</summary>
+    public int DemoKeysPerHour { get; init; } = 5;
 }
 
 internal static class RateLimiting
 {
+    public const string DemoKeyPolicy = "demo-key";
+
     public static IServiceCollection AddRelayRateLimiting(this IServiceCollection services, RateLimitOptions options) =>
         services.AddRateLimiter(o =>
         {
             o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            o.AddPolicy(DemoKeyPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
+                $"demo:{context.Connection.RemoteIpAddress}",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = options.DemoKeysPerHour, Window = TimeSpan.FromHours(1), QueueLimit = 0 }));
             o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
             {
                 var key = context.User.FindFirstValue(ClaimTypes.NameIdentifier);

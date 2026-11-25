@@ -12,6 +12,9 @@ var connectionString = builder.Configuration.GetConnectionString("Relay")
 var messaging = builder.Configuration.GetSection(MessagingOptions.Section).Get<MessagingOptions>() ?? new MessagingOptions();
 var delivery = builder.Configuration.GetSection(DeliveryOptions.Section).Get<DeliveryOptions>() ?? new DeliveryOptions();
 var providers = builder.Configuration.GetSection("Relay:Providers").Get<ProviderSettings[]>() ?? [];
+var sandboxOptions = builder.Configuration.GetSection(Relay.Infrastructure.Sandbox.SandboxOptions.Section).Get<Relay.Infrastructure.Sandbox.SandboxOptions>() ?? new();
+sandboxOptions.EnsureSinkOnly(providers);
+
 if (providers.Length == 0)
 {
     throw new InvalidOperationException("Relay:Providers is empty. Configure at least one delivery provider.");
@@ -21,7 +24,7 @@ builder.Services
     .AddRelayCore(connectionString, messaging)
     .AddRelayDelivery(delivery)
     .AddRelayProviders(providers)
-    .AddRelayOps(builder.Configuration.GetSection(Relay.Infrastructure.Sandbox.SandboxOptions.Section).Get<Relay.Infrastructure.Sandbox.SandboxOptions>() ?? new())
+    .AddRelayOps(sandboxOptions)
     .AddRelayQueueMetrics()
     .AddHostedService<OutboxRelayService>()
     .AddHostedService<MetricsSnapshotService>();
