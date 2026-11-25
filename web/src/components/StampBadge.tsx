@@ -24,7 +24,7 @@ export const toneClass: Record<Tone, string> = {
 };
 
 /** A rubber stamp: the only decoration in the app. */
-export function StampBadge({ status, className }: { status: MessageStatus; className?: string }) {
+export function StampBadge({ status, className, thunk }: { status: MessageStatus; className?: string; thunk?: boolean }) {
   const look = statusLook[status];
   return (
     <span
@@ -32,6 +32,7 @@ export function StampBadge({ status, className }: { status: MessageStatus; class
       className={cn(
         "inline-block -rotate-2 rounded-sm border-2 border-double px-2 py-0.5 font-sign text-xs tracking-widest uppercase",
         toneClass[look.tone],
+        thunk && "thunk",
         className,
       )}
     >

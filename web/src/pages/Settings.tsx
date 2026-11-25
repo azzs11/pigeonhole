@@ -22,8 +22,8 @@ export default function Settings() {
             Signed in with <code className="font-log">{key.slice(0, 12)}…</code>
           </p>
           <p className="mt-2 text-xs text-muted">
-            Keys are created and revoked with the CLI (<code className="font-log">relay keys create | revoke</code>), shown once and stored
-            hashed. Rotate by creating a new key, then revoking the old one.
+            Keys are created and revoked with the CLI (<code className="font-log">relay keys create | revoke</code>
+            ), shown once and stored hashed. Rotate by creating a new key, then revoking the old one.
           </p>
           <Button
             className="mt-3"
@@ -42,8 +42,20 @@ export default function Settings() {
           <p className="mt-2 text-sm">
             {used.toLocaleString()} of {limit.toLocaleString()} recipients used today (resets 00:00 UTC).
           </p>
-          <div className="mt-2 h-3 w-full rounded bg-paper" role="progressbar" aria-label="Quota used" aria-valuemin={0} aria-valuemax={limit} aria-valuenow={used}>
-            <div className="h-3 rounded bg-accent" style={{ width: `${limit ? Math.min(100, (used / limit) * 100) : 0}%` }} />
+          <div
+            className="mt-2 h-4 w-full border-2 border-ink bg-paper"
+            role="progressbar"
+            aria-label="Quota used"
+            aria-valuemin={0}
+            aria-valuemax={limit}
+            aria-valuenow={used}
+          >
+            <div
+              className="h-full bg-hover"
+              style={{
+                width: `${limit ? Math.min(100, (used / limit) * 100) : 0}%`,
+              }}
+            />
           </div>
           {stats.data?.pausedReason && <p className="mt-3 text-sm text-bad">Paused: {stats.data.pausedReason}</p>}
           <p className="mt-3 text-xs text-muted">

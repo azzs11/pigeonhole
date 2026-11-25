@@ -20,39 +20,91 @@ export function SortingOffice({ stats, providers, down, motion }: Props) {
   const by = (s: string) => num(stats?.byStatus?.[s]);
   const flow = Math.min(8, Math.ceil(num(stats?.sentLast5Min) / 10));
   const rooms = [
-    { x: 20, label: "Intake", count: by("Accepted"), note: "accepted" },
-    { x: 205, label: "Agent guard", count: by("Held"), note: "held for approval" },
-    { x: 390, label: "Sorting", count: num(stats?.outboxDepth), note: "in the outbox" },
+    {
+      x: 20,
+      label: "Intake",
+      count: by("Accepted"),
+      note: "accepted",
+      wrap: "var(--wrap-pink)",
+    },
+    {
+      x: 205,
+      label: "Agent guard",
+      count: by("Held"),
+      note: "held for approval",
+      wrap: "var(--wrap-blue)",
+    },
+    {
+      x: 390,
+      label: "Sorting",
+      count: num(stats?.outboxDepth),
+      note: "in the outbox",
+      wrap: "var(--wrap-yellow)",
+    },
   ];
   const bins = [
-    { label: "Delivered", count: by("Delivered") + by("Sent"), tone: "var(--good)" },
+    {
+      label: "Delivered",
+      count: by("Delivered") + by("Sent"),
+      tone: "var(--good)",
+    },
     { label: "Returned", count: by("Bounced"), tone: "var(--bad)" },
     { label: "Unknown", count: by("Unknown"), tone: "var(--warn)" },
-    { label: "Dead letter", count: by("DeadLettered") + by("Rejected"), tone: "var(--bad)" },
+    {
+      label: "Dead letter",
+      count: by("DeadLettered") + by("Rejected"),
+      tone: "var(--bad)",
+    },
   ];
   const list = providers?.length ? providers : [{ name: "no provider reporting", circuitState: "Closed" }];
 
   return (
-    <figure className="rounded-lg border border-line bg-panel p-3">
+    <figure className="border-2 border-ink bg-panel p-3">
       <svg viewBox="0 0 1000 380" className="h-auto w-full" aria-hidden="true">
-        <path id="mainline" d="M 30 305 L 970 305" stroke="var(--line)" strokeWidth="6" strokeDasharray="2 10" fill="none" />
+        <path id="mainline" d="M 30 305 L 970 305" stroke="var(--ink)" strokeWidth="4" strokeDasharray="2 12" fill="none" />
         {rooms.map((r) => (
           <g key={r.label}>
-            <rect x={r.x} y={110} width={150} height={160} fill="var(--paper)" stroke="var(--ink)" strokeWidth="3" />
-            <text x={r.x + 75} y={140} textAnchor="middle" fontFamily="Oswald, sans-serif" fontSize="18" fill="var(--ink)" letterSpacing="2">
+            <rect x={r.x} y={110} width={150} height={160} fill={r.wrap} stroke="var(--ink)" strokeWidth="3" />
+            <text
+              x={r.x + 75}
+              y={140}
+              textAnchor="middle"
+              fontFamily="Barlow Condensed, sans-serif"
+              fontWeight="800"
+              fontSize="18"
+              fill="var(--on-wrap)"
+              letterSpacing="2"
+            >
               {r.label.toUpperCase()}
             </text>
-            <text x={r.x + 75} y={205} textAnchor="middle" fontFamily="IBM Plex Mono, monospace" fontSize="34" fontWeight="600" fill="var(--ink)">
+            <text
+              x={r.x + 75}
+              y={205}
+              textAnchor="middle"
+              fontFamily="Barlow Condensed, sans-serif"
+              fontSize="52"
+              fontWeight="800"
+              fill="var(--on-wrap)"
+            >
               {r.count}
             </text>
-            <text x={r.x + 75} y={235} textAnchor="middle" fontSize="13" fill="var(--muted)">
+            <text x={r.x + 75} y={235} textAnchor="middle" fontSize="13" fill="var(--on-wrap)">
               {r.note}
             </text>
           </g>
         ))}
         <g>
           <rect x={575} y={30} width={180} height={320} fill="var(--paper)" stroke="var(--ink)" strokeWidth="3" />
-          <text x={665} y={58} textAnchor="middle" fontFamily="Oswald, sans-serif" fontSize="18" letterSpacing="2" fill="var(--ink)">
+          <text
+            x={665}
+            y={58}
+            textAnchor="middle"
+            fontFamily="Barlow Condensed, sans-serif"
+            fontWeight="800"
+            fontSize="18"
+            letterSpacing="2"
+            fill="var(--ink)"
+          >
             PROVIDERS
           </text>
           {list.slice(0, 4).map((p, i) => {
@@ -75,10 +127,27 @@ export function SortingOffice({ stats, providers, down, motion }: Props) {
         {bins.map((b, i) => (
           <g key={b.label}>
             <rect x={800} y={30 + i * 82} width={180} height={70} fill="var(--paper)" stroke={b.tone} strokeWidth="3" />
-            <text x={890} y={58 + i * 82} textAnchor="middle" fontFamily="Oswald, sans-serif" fontSize="15" letterSpacing="2" fill="var(--ink)">
+            <text
+              x={890}
+              y={58 + i * 82}
+              textAnchor="middle"
+              fontFamily="Barlow Condensed, sans-serif"
+              fontWeight="800"
+              fontSize="15"
+              letterSpacing="2"
+              fill="var(--ink)"
+            >
               {b.label.toUpperCase()}
             </text>
-            <text x={890} y={88 + i * 82} textAnchor="middle" fontFamily="IBM Plex Mono, monospace" fontSize="22" fontWeight="600" fill={b.tone}>
+            <text
+              x={890}
+              y={88 + i * 82}
+              textAnchor="middle"
+              fontFamily="Barlow Condensed, sans-serif"
+              fontSize="30"
+              fontWeight="800"
+              fill={b.tone}
+            >
               {b.count}
             </text>
           </g>

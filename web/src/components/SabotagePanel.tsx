@@ -4,13 +4,20 @@ import { Card, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { num } from "@/lib/utils";
 
-type Props = { providers: Schemas["ProviderHealth"][]; switches: Schemas["SwitchesDto"] | undefined };
+type Props = {
+  providers: Schemas["ProviderHealth"][];
+  switches: Schemas["SwitchesDto"] | undefined;
+};
 
 /** Sandbox only. Play first, explain after: every switch says what you should see. */
 export function SabotagePanel({ providers, switches }: Props) {
   const set = useSetSwitches();
   const batch = useBatch();
-  const current = switches ?? { downProviders: [], delayMilliseconds: 0, crashRate: 0 };
+  const current = switches ?? {
+    downProviders: [],
+    delayMilliseconds: 0,
+    crashRate: 0,
+  };
   const update = (patch: Partial<Schemas["SwitchesDto"]>) => set.mutate({ ...current, ...patch });
 
   return (
@@ -23,7 +30,11 @@ export function SabotagePanel({ providers, switches }: Props) {
             Send a test batch (200)
           </Button>
           <p className="mt-1 text-xs text-muted">You should see: Intake fill up, then drain into Delivered within seconds.</p>
-          {batch.isSuccess && <p className="text-sm text-good" role="status">Batch accepted.</p>}
+          {batch.isSuccess && (
+            <p className="text-sm text-good" role="status">
+              Batch accepted.
+            </p>
+          )}
         </div>
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium">Kill a provider</legend>
@@ -37,21 +48,29 @@ export function SabotagePanel({ providers, switches }: Props) {
                   className="size-5"
                   checked={off}
                   onChange={() =>
-                    update({ downProviders: off ? current.downProviders.filter((d) => d !== name) : [...current.downProviders, name] })
+                    update({
+                      downProviders: off ? current.downProviders.filter((d) => d !== name) : [...current.downProviders, name],
+                    })
                   }
                 />
                 Switch off <strong>{name}</strong>
               </label>
             );
           })}
-          <p className="text-xs text-muted">You should see: traffic move to the next provider; with all off, mail waits in Sorting and none is lost.</p>
+          <p className="text-xs text-muted">
+            You should see: traffic move to the next provider; with all off, mail waits in Sorting and none is lost.
+          </p>
         </fieldset>
         <label className="block text-sm">
           <span className="font-medium">Slow every provider call</span>
           <select
-            className="mt-1 block min-h-10 rounded-md border border-line bg-panel px-2"
+            className="mt-1 block min-h-10 border-2 border-ink bg-panel px-2"
             value={num(current.delayMilliseconds)}
-            onChange={(e) => update({ delayMilliseconds: Number(e.target.value) })}
+            onChange={(e) =>
+              update({
+                delayMilliseconds: Number(e.target.value),
+              })
+            }
           >
             <option value={0}>No delay</option>
             <option value={500}>500 ms</option>
@@ -61,7 +80,7 @@ export function SabotagePanel({ providers, switches }: Props) {
         <label className="block text-sm">
           <span className="font-medium">Crash the worker after the provider accepts</span>
           <select
-            className="mt-1 block min-h-10 rounded-md border border-line bg-panel px-2"
+            className="mt-1 block min-h-10 border-2 border-ink bg-panel px-2"
             value={num(current.crashRate)}
             onChange={(e) => update({ crashRate: Number(e.target.value) })}
           >

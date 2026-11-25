@@ -16,7 +16,14 @@ function SendForm() {
   const submit = (e: FormEvent) => {
     e.preventDefault();
     send.mutate(
-      { to: form.to.split(",").map((s) => s.trim()).filter(Boolean), subject: form.subject, text: form.text },
+      {
+        to: form.to
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+        subject: form.subject,
+        text: form.text,
+      },
       { onSuccess: () => setForm({ to: "", subject: "", text: "" }) },
     );
   };
@@ -26,7 +33,13 @@ function SendForm() {
       <form onSubmit={submit} className="mt-3 grid gap-3 md:grid-cols-3">
         <div>
           <Label htmlFor="to">To</Label>
-          <Input id="to" value={form.to} onChange={(e) => setForm({ ...form, to: e.target.value })} placeholder="someone@example.test" required />
+          <Input
+            id="to"
+            value={form.to}
+            onChange={(e) => setForm({ ...form, to: e.target.value })}
+            placeholder="someone@example.test"
+            required
+          />
         </div>
         <div>
           <Label htmlFor="subject">Subject</Label>
@@ -72,7 +85,9 @@ function MessagePanel({ id, onClose }: { id: string | null; onClose: () => void 
             <Button variant="outline" onClick={() => id && bounce.mutate(id)} disabled={bounce.isPending}>
               Simulate a bounce
             </Button>
-            <p className="mt-1 text-xs text-muted">Plays the provider's hard-bounce webhook. You should see Returned, and the address on Suppressions.</p>
+            <p className="mt-1 text-xs text-muted">
+              Plays the provider's hard-bounce webhook. You should see Returned, and the address on Suppressions.
+            </p>
           </div>
         )}
       </DialogContent>
@@ -98,7 +113,11 @@ export default function Messages() {
       <SendForm />
       <label className="mb-3 flex items-center gap-2 text-sm">
         Show
-        <select className="min-h-10 rounded-md border border-line bg-panel px-2" value={filter ?? ""} onChange={(e) => set("status", e.target.value || null)}>
+        <select
+          className="min-h-11 border-2 border-ink bg-panel px-2"
+          value={filter ?? ""}
+          onChange={(e) => set("status", e.target.value || null)}
+        >
           <option value="">all states</option>
           {Object.entries(statusLook).map(([k, v]) => (
             <option key={k} value={k}>
@@ -107,10 +126,10 @@ export default function Messages() {
           ))}
         </select>
       </label>
-      <div className="overflow-x-auto rounded-lg border border-line bg-panel">
+      <div className="overflow-x-auto border-2 border-ink bg-panel">
         <table className="w-full text-sm">
           <caption className="sr-only">Messages, newest first</caption>
-          <thead className="border-b border-line text-left">
+          <thead className="border-b-2 border-ink bg-ink text-left font-sign text-sm tracking-wider text-paper uppercase">
             <tr>
               <th className="p-2">State</th>
               <th className="p-2">To</th>

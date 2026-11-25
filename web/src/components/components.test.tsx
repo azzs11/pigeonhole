@@ -23,8 +23,18 @@ describe("Timeline", () => {
           status: "Unknown",
           summary: "Outcome unknown; held to avoid a duplicate.",
           steps: [
-            { at: "2026-11-25T12:00:00Z", from: null, to: "Accepted", explanation: "Accepted and stored." },
-            { at: "2026-11-25T12:00:01Z", from: "Sending", to: "Unknown", explanation: "We cannot tell whether the provider received it." },
+            {
+              at: "2026-11-25T12:00:00Z",
+              from: null,
+              to: "Accepted",
+              explanation: "Accepted and stored.",
+            },
+            {
+              at: "2026-11-25T12:00:01Z",
+              from: "Sending",
+              to: "Unknown",
+              explanation: "We cannot tell whether the provider received it.",
+            },
           ],
         }}
       />,
@@ -37,7 +47,17 @@ describe("Timeline", () => {
 
 describe("PromisesPanel", () => {
   it("states a broken promise in words, not only in red", () => {
-    render(<PromisesPanel promises={[{ name: "Nothing sent twice", kept: false, detail: "2 Message-IDs arrived more than once." }]} />);
+    render(
+      <PromisesPanel
+        promises={[
+          {
+            name: "Nothing sent twice",
+            kept: false,
+            detail: "2 Message-IDs arrived more than once.",
+          },
+        ]}
+      />,
+    );
     expect(screen.getByText("Broken: Nothing sent twice")).toBeInTheDocument();
   });
 });
@@ -45,10 +65,21 @@ describe("PromisesPanel", () => {
 describe("ApprovalCard", () => {
   it("approves with A and rejects with R when the card has focus", async () => {
     const onDecide = vi.fn();
-    const qc = new QueryClient({ defaultOptions: { queries: { enabled: false } } });
+    const qc = new QueryClient({
+      defaultOptions: { queries: { enabled: false } },
+    });
     render(
       <QueryClientProvider client={qc}>
-        <ApprovalCard approval={{ id: "a1", messageId: "m1", riskScore: 50, reasons: ["x was not named on this run."], source: "guard" }} onDecide={onDecide} />
+        <ApprovalCard
+          approval={{
+            id: "a1",
+            messageId: "m1",
+            riskScore: 50,
+            reasons: ["x was not named on this run."],
+            source: "guard",
+          }}
+          onDecide={onDecide}
+        />
       </QueryClientProvider>,
     );
     const card = screen.getByRole("article");
@@ -64,7 +95,15 @@ describe("SortingOffice", () => {
   it("gives screen readers the same facts as the floor plan", () => {
     render(
       <SortingOffice
-        stats={{ byStatus: { Accepted: 3, Delivered: 5 }, outboxDepth: 2, acceptedLast5Min: 8, sentLast5Min: 5, quotaUsed: 8, dailyQuota: 100, pausedReason: null }}
+        stats={{
+          byStatus: { Accepted: 3, Delivered: 5 },
+          outboxDepth: 2,
+          acceptedLast5Min: 8,
+          sentLast5Min: 5,
+          quotaUsed: 8,
+          dailyQuota: 100,
+          pausedReason: null,
+        }}
         providers={[{ name: "mailpit", circuitState: "Closed", position: 0 }]}
         down={["mailpit"]}
         motion={false}

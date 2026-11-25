@@ -5,7 +5,7 @@ export const Dialog = DialogPrimitive.Root;
 export const DialogTrigger = DialogPrimitive.Trigger;
 export const DialogClose = DialogPrimitive.Close;
 export const DialogTitle = ({ className, ...p }: DialogPrimitive.DialogTitleProps) => (
-  <DialogPrimitive.Title className={cn("font-sign text-xl uppercase", className)} {...p} />
+  <DialogPrimitive.Title className={cn("font-sign text-3xl font-extrabold uppercase", className)} {...p} />
 );
 export const DialogDescription = DialogPrimitive.Description;
 
@@ -14,7 +14,7 @@ export const DialogContent = ({ className, children, side, ...props }: DialogPri
     <DialogPrimitive.Overlay className="fixed inset-0 bg-black/40" />
     <DialogPrimitive.Content
       className={cn(
-        "fixed z-50 overflow-y-auto border border-line bg-panel p-6 shadow-xl",
+        "fixed z-50 overflow-y-auto border-2 border-ink bg-panel p-6",
         side
           ? "inset-y-0 right-0 w-full max-w-xl"
           : "top-1/2 left-1/2 w-[calc(100%-32px)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg",

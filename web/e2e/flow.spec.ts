@@ -8,8 +8,8 @@ test("send, watch the timeline, bounce into a suppression, approve a held messag
 
   // Sign in through the real form once.
   await page.goto("/");
-  await page.getByLabel("API key").fill(apiKey());
-  await page.getByRole("button", { name: "Open the sorting office" }).click();
+  await page.getByLabel(/API key/).fill(apiKey());
+  await page.getByRole("button", { name: "Open", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Sorting office" })).toBeVisible();
 
   // Send, then watch the timeline reach Sent (the worker delivers to Mailpit).
@@ -32,11 +32,20 @@ test("send, watch the timeline, bounce into a suppression, approve a held messag
 
   // An agent mails someone the run did not name: the Guard holds it; a human approves it.
   const operator = { Authorization: `Bearer ${apiKey()}` };
-  const run = await (await request.post("/v1/agent-runs", { headers: operator, data: { trustedRecipients: ["maya@example.test"] } })).json();
+  const run = await (
+    await request.post("/v1/agent-runs", {
+      headers: operator,
+      data: { trustedRecipients: ["maya@example.test"] },
+    })
+  ).json();
   const heldSubject = `Held for review ${id}`;
   const held = await request.post("/v1/agent/messages", {
     headers: { Authorization: `Bearer ${run.token}` },
-    data: { to: [`vendor-${id}@outside.test`], subject: heldSubject, text: "Quote attached." },
+    data: {
+      to: [`vendor-${id}@outside.test`],
+      subject: heldSubject,
+      text: "Quote attached.",
+    },
   });
   expect((await held.json()).status).toBe("Held");
 

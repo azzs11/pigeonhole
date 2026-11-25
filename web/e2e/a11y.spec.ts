@@ -13,6 +13,16 @@ const pages = [
 ] as const;
 
 async function serious(page: import("@playwright/test").Page) {
+  // Let one-off entrance animations finish: mid-fade text would be measured at partial opacity.
+  // Looping ones (ticker, letters) are infinite and skipped.
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((a) => a.effect?.getComputedTiming().iterations !== Infinity)
+        .map((a) => a.finished),
+    ),
+  );
   const result = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
   return result.violations
     .filter((v) => v.impact === "serious" || v.impact === "critical")
@@ -21,7 +31,7 @@ async function serious(page: import("@playwright/test").Page) {
 
 test("sign-in page has no serious accessibility violations", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByLabel("API key")).toBeVisible();
+  await expect(page.getByLabel(/API key/)).toBeVisible();
   expect(await serious(page)).toEqual([]);
 });
 

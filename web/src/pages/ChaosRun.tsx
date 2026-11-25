@@ -7,7 +7,12 @@ import { PageTitle } from "@/components/Layout";
 import { Card, CardTitle } from "@/components/ui/card";
 import { num } from "@/lib/utils";
 
-type Run = { system: string; faultRate: number; duplicatesPer10k: number; lostPer10k: number };
+type Run = {
+  system: string;
+  faultRate: number;
+  duplicatesPer10k: number;
+  lostPer10k: number;
+};
 const colors: Record<string, string> = {
   "naive send-then-save": "var(--bad)",
   "outbox only": "var(--warn)",
@@ -33,8 +38,8 @@ export default function ChaosRun() {
       <Card>
         <CardTitle>MailChaos: three systems, same faults</CardTitle>
         <p className="mt-1 text-sm text-muted">
-          {results.messagesPerRun.toLocaleString()} messages per run, seed {results.seed}, commit <code className="font-log">{results.commit}</code>. Rerun with{" "}
-          <code className="font-log">bench/run-mailchaos.sh</code>.
+          {results.messagesPerRun.toLocaleString()} messages per run, seed {results.seed}, commit{" "}
+          <code className="font-log">{results.commit}</code>. Rerun with <code className="font-log">bench/run-mailchaos.sh</code>.
         </p>
         <div className="mt-4 grid gap-6 md:grid-cols-2">
           <LineChart title="Duplicate sends per 10,000" series={series("duplicatesPer10k")} xLabel="injected fault rate (%)" />
@@ -42,7 +47,7 @@ export default function ChaosRun() {
         </div>
         <table className="mt-4 w-full text-sm">
           <caption className="sr-only">MailChaos results: duplicates and losses per 10,000 at each fault rate</caption>
-          <thead className="border-b border-line text-left">
+          <thead className="border-b-2 border-ink bg-ink text-left font-sign text-sm tracking-wider text-paper uppercase">
             <tr>
               <th className="p-1">System</th>
               {results.faultRates.map((f: number) => (
@@ -73,10 +78,10 @@ export default function ChaosRun() {
       {sandbox.data?.enabled && (
         <div className="mt-6 grid gap-4 md:grid-cols-2">
           <div className="grid grid-cols-2 gap-3">
-            <StatTile label="Delivered or sent" value={by("Delivered") + by("Sent")} />
-            <StatTile label="Unknown (held, not resent)" value={by("Unknown")} />
-            <StatTile label="Waiting in outbox" value={num(stats.data?.outboxDepth)} />
-            <StatTile label="Returned" value={by("Bounced")} />
+            <StatTile wrap="bg-wrap-mint" label="Delivered or sent" value={by("Delivered") + by("Sent")} />
+            <StatTile wrap="bg-wrap-yellow" label="Unknown (held, not resent)" value={by("Unknown")} />
+            <StatTile wrap="bg-wrap-blue" label="Waiting in outbox" value={num(stats.data?.outboxDepth)} />
+            <StatTile wrap="bg-wrap-pink" label="Returned" value={by("Bounced")} />
           </div>
           <PromisesPanel promises={promises.data} />
         </div>

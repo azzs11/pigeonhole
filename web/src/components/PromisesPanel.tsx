@@ -9,10 +9,7 @@ export function PromisesPanel({ promises }: { promises: Schemas["Promise"][] | u
       <CardTitle>Promises</CardTitle>
       <ul className="mt-3 space-y-2" aria-live="polite">
         {(promises ?? []).map((p) => (
-          <li
-            key={p.name}
-            className={cn("rounded-md border-l-4 p-2", p.kept ? "border-good bg-good-bg" : "border-bad bg-bad-bg")}
-          >
+          <li key={p.name} className={cn("border-l-8 p-3", p.kept ? "border-good bg-good-bg" : "border-bad bg-bad-bg")}>
             <div className={cn("font-medium", p.kept ? "text-good" : "text-bad")}>
               {p.kept ? "Kept" : "Broken"}: {p.name}
             </div>

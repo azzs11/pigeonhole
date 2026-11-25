@@ -1,58 +1,73 @@
 @import "tailwindcss";
 
-/* Colour means status only, and always comes with a word. One palette, light and dark. */
+/*
+ * "Chocolate shop" look (ADR 0009): warm cream paper, ink-black type, cocoa accents, square
+ * corners, condensed uppercase headings and bold flat "wrapper" colour blocks.
+ * Status colours (good / warn / bad / neutral) still mean status only and always come with a word.
+ * Wrapper colours (--wrap-*) are decoration only and never carry status; text on them is --on-wrap.
+ */
 :root {
-  --paper: #f4efe6;
-  --panel: #fffdf8;
-  --ink: #1f2a37;
-  --muted: #5b6573;
-  --line: #d6cdbd;
-  --accent: #1f4e79;
+  --paper: #f7f1e8;
+  --panel: #fffcf5;
+  --ink: #1c1c1c;
+  --muted: #5a4d44;
+  --line: #d9ccb8;
+  --accent: #36241a;
+  --hover: #22703d;
   --good: #166534;
   --good-bg: #dcfce7;
   --warn: #8a4b00;
-  --warn-bg: #fef3c7;
+  --warn-bg: #fdecc8;
   --bad: #b42318;
   --bad-bg: #fee4e2;
-  --neutral: #1f4e79;
-  --neutral-bg: #e0ebf6;
+  --neutral: #1e3764;
+  --neutral-bg: #e2eaf7;
+  --on-wrap: #1c1c1c;
+  --wrap-pink: #f7b8cb;
+  --wrap-yellow: #f6d24a;
+  --wrap-blue: #a6cff2;
+  --wrap-mint: #a9dfc0;
+  --wrap-orange: #f6a873;
+  --wrap-lilac: #d2c0f2;
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: #12161c;
-    --panel: #1a2028;
-    --ink: #ece7dd;
-    --muted: #a8b0bc;
-    --line: #34404e;
-    --accent: #8cb8e8;
+    --paper: #15100d;
+    --panel: #211914;
+    --ink: #f7f1e8;
+    --muted: #c4b6a7;
+    --line: #4a3a2f;
+    --accent: #e9c9a0;
+    --hover: #6fd39a;
     --good: #6ee7a0;
     --good-bg: #0f2e1d;
     --warn: #fbbf5c;
     --warn-bg: #33250b;
     --bad: #fca5a0;
     --bad-bg: #3a1513;
-    --neutral: #9cc2ec;
+    --neutral: #a9c6ee;
     --neutral-bg: #142536;
     color-scheme: dark;
   }
 }
 
 :root[data-theme="dark"] {
-  --paper: #12161c;
-  --panel: #1a2028;
-  --ink: #ece7dd;
-  --muted: #a8b0bc;
-  --line: #34404e;
-  --accent: #8cb8e8;
+  --paper: #15100d;
+  --panel: #211914;
+  --ink: #f7f1e8;
+  --muted: #c4b6a7;
+  --line: #4a3a2f;
+  --accent: #e9c9a0;
+  --hover: #6fd39a;
   --good: #6ee7a0;
   --good-bg: #0f2e1d;
   --warn: #fbbf5c;
   --warn-bg: #33250b;
   --bad: #fca5a0;
   --bad-bg: #3a1513;
-  --neutral: #9cc2ec;
+  --neutral: #a9c6ee;
   --neutral-bg: #142536;
   color-scheme: dark;
 }
@@ -64,6 +79,7 @@
   --color-muted: var(--muted);
   --color-line: var(--line);
   --color-accent: var(--accent);
+  --color-hover: var(--hover);
   --color-good: var(--good);
   --color-good-bg: var(--good-bg);
   --color-warn: var(--warn);
@@ -72,19 +88,45 @@
   --color-bad-bg: var(--bad-bg);
   --color-neutral: var(--neutral);
   --color-neutral-bg: var(--neutral-bg);
-  --font-sign: "Oswald", "Arial Narrow", system-ui, sans-serif;
+  --color-on-wrap: var(--on-wrap);
+  --color-wrap-pink: var(--wrap-pink);
+  --color-wrap-yellow: var(--wrap-yellow);
+  --color-wrap-blue: var(--wrap-blue);
+  --color-wrap-mint: var(--wrap-mint);
+  --color-wrap-orange: var(--wrap-orange);
+  --color-wrap-lilac: var(--wrap-lilac);
+  --font-sign: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-log: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+}
+
+/* Square corners everywhere, like a chocolate wrapper. */
+@theme {
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
 }
 
 html,
 body {
   background: var(--paper);
   color: var(--ink);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-body);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-sign);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
 }
 
 :focus-visible {
-  outline: 3px solid var(--accent);
+  outline: 3px solid var(--hover);
   outline-offset: 2px;
 }
 
@@ -93,4 +135,117 @@ body {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* ---------- Motion. Everything here switches off with the Motion toggle or reduced motion. ---------- */
+html[data-motion="off"] *,
+html[data-motion="off"] *::before,
+html[data-motion="off"] *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Hover lift with a hard offset shadow, like a bar slid out of the box. */
+.lift {
+  transition:
+    transform 160ms cubic-bezier(0.3, 0.7, 0.4, 1.4),
+    box-shadow 160ms ease;
+}
+.lift:hover {
+  transform: translate(-3px, -3px) rotate(var(--tilt, -0.6deg));
+  box-shadow: 6px 6px 0 var(--ink);
+}
+
+/* Buttons press down. */
+.press {
+  box-shadow: 0 0 0 var(--ink);
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    background-color 150ms ease,
+    color 150ms ease;
+}
+.press:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 4px 4px 0 var(--ink);
+}
+.press:active {
+  transform: translate(0, 0);
+  box-shadow: 0 0 0 var(--ink);
+}
+
+/* Sections slide up in sequence on load; set --i for the order. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+.rise {
+  animation: rise 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+/* The ticker strip. */
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+.marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee 38s linear infinite;
+}
+.marquee:hover {
+  animation-play-state: paused;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.spin-slow {
+  animation: spin 24s linear infinite;
+}
+
+/* A stamp lands when its status changes. */
+@keyframes thunk {
+  0% {
+    transform: scale(1.5) rotate(-8deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(0.94) rotate(-2deg);
+    opacity: 1;
+  }
+}
+.thunk {
+  animation: thunk 380ms cubic-bezier(0.3, 0.7, 0.4, 1.3) both;
+}
+
+/* Letters flying into the pigeonhole wall. */
+@keyframes post {
+  0% {
+    transform: translate(var(--fx), var(--fy)) rotate(-25deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  55%,
+  85% {
+    transform: translate(0, 0) rotate(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(0, 0) rotate(0);
+    opacity: 0;
+  }
+}
+.post {
+  animation: post var(--dur, 4.8s) cubic-bezier(0.2, 0.7, 0.2, 1) infinite both;
+  animation-delay: var(--delay, 0s);
+  transform-box: fill-box;
 }

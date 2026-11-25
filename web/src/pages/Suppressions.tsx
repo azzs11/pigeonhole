@@ -4,7 +4,11 @@ import { PageTitle } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 
-const reasonWord = { HardBounce: "Hard bounce", Complaint: "Complaint", Manual: "Added by hand" } as const;
+const reasonWord = {
+  HardBounce: "Hard bounce",
+  Complaint: "Complaint",
+  Manual: "Added by hand",
+} as const;
 
 export default function Suppressions() {
   const list = useSuppressions();
@@ -14,10 +18,10 @@ export default function Suppressions() {
   return (
     <>
       <PageTitle lead="Addresses this tenant will not send to, and why.">Suppressions</PageTitle>
-      <div className="overflow-x-auto rounded-lg border border-line bg-panel">
+      <div className="overflow-x-auto border-2 border-ink bg-panel">
         <table className="w-full text-sm">
           <caption className="sr-only">Suppressed addresses</caption>
-          <thead className="border-b border-line text-left">
+          <thead className="border-b-2 border-ink bg-ink text-left font-sign text-sm tracking-wider text-paper uppercase">
             <tr>
               <th className="p-2">Address</th>
               <th className="p-2">Reason</th>
@@ -60,7 +64,15 @@ export default function Suppressions() {
             <DialogClose asChild>
               <Button variant="outline">Keep it</Button>
             </DialogClose>
-            <Button variant="bad" onClick={() => confirm && remove.mutate(confirm, { onSuccess: () => setConfirm(null) })}>
+            <Button
+              variant="bad"
+              onClick={() =>
+                confirm &&
+                remove.mutate(confirm, {
+                  onSuccess: () => setConfirm(null),
+                })
+              }
+            >
               Remove
             </Button>
           </div>

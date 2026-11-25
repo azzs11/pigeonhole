@@ -51,9 +51,15 @@ export default function Providers() {
             </Card>
           );
         })}
-        {items.length === 0 && <p className="text-muted">No worker has reported yet. Start one with <code className="font-log">dotnet run --project src/Relay.Worker</code>.</p>}
+        {items.length === 0 && (
+          <p className="text-muted">
+            No worker has reported yet. Start one with <code className="font-log">dotnet run --project src/Relay.Worker</code>.
+          </p>
+        )}
       </div>
-      <p className="mt-4 text-sm text-muted">Failover order comes from <code className="font-log">Relay:Providers</code> in the worker's configuration.</p>
+      <p className="mt-4 text-sm text-muted">
+        Failover order comes from <code className="font-log">Relay:Providers</code> in the worker's configuration.
+      </p>
     </>
   );
 }

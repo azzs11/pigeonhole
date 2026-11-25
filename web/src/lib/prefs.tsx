@@ -13,6 +13,9 @@ export function PrefsProvider({ children }: { children: ReactNode }) {
     if (theme === "system") document.documentElement.removeAttribute("data-theme");
     else document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
+  useEffect(() => {
+    document.documentElement.setAttribute("data-motion", motion ? "on" : "off");
+  }, [motion]);
   const value: Prefs = {
     motion,
     setMotion: (v) => {
