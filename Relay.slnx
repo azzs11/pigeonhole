@@ -10,6 +10,10 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Relay.ArchitectureTests/Relay.ArchitectureTests.csproj" />
+    <Project Path="tests/Relay.IntegrationTests/Relay.IntegrationTests.csproj" />
     <Project Path="tests/Relay.UnitTests/Relay.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Relay.Cli/Relay.Cli.csproj" />
   </Folder>
 </Solution>

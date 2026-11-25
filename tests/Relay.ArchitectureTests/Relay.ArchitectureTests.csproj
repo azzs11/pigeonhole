@@ -20,6 +20,7 @@
     <ProjectReference Include="..\..\src\Relay.Api\Relay.Api.csproj" />
     <ProjectReference Include="..\..\src\Relay.Worker\Relay.Worker.csproj" />
     <ProjectReference Include="..\..\src\Relay.Mcp\Relay.Mcp.csproj" />
+    <ProjectReference Include="..\..\tools\Relay.Cli\Relay.Cli.csproj" />
   </ItemGroup>
 
 </Project>

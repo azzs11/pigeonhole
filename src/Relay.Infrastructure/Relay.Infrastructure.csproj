@@ -1,6 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- EF Core, outbox, provider adapters, resilience (Phases 1-2). -->
+  <!-- EF Core + PostgreSQL persistence and the outbox. Provider adapters arrive in Phase 2. -->
+
+  <ItemGroup>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="EFCore.NamingConventions" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Relay.Application\Relay.Application.csproj" />

@@ -1,55 +1,49 @@
-# Requests for the Phase 0 API. Run `dotnet run --project src/Relay.Api`.
-# apiKey is the development seed key from InMemoryUserService. It is removed in
-# Phase 1, when keys are created with the CLI and stored hashed.
+# Start PostgreSQL:  docker compose -f deploy/docker-compose.yml up -d
+# Create a key:      dotnet run --project tools/Relay.Cli -- keys create --tenant demo
+# Run the API:       dotnet run --project src/Relay.Api
+# Paste the printed key below. Never commit a real key.
 
 @host = http://localhost:5238
-@apiKey = test-api-key-12345
+@apiKey = paste-your-key-here
 
 ### Health (no key needed)
 GET {{host}}/health
 
-### Send one email
+### Send a message (idempotent: repeat with the same key and body to get the same id)
 # @name send
-POST {{host}}/api/emails/send
-X-API-Key: {{apiKey}}
+POST {{host}}/v1/messages
+Authorization: Bearer {{apiKey}}
+Idempotency-Key: demo-1
 Content-Type: application/json
 
 {
-  "to": "recipient@example.test",
+  "to": ["recipient@example.test"],
   "subject": "Hello from Relay",
-  "body": "<p>It works.</p>",
-  "isHtml": true
+  "html": "<p>It works.</p>",
+  "text": "It works."
 }
 
-### Get that email by id
-GET {{host}}/api/emails/{{send.response.body.$.id}}
-X-API-Key: {{apiKey}}
+### Get that message with its timeline
+GET {{host}}/v1/messages/{{send.response.body.$.id}}
+Authorization: Bearer {{apiKey}}
 
-### List my emails (paged)
-GET {{host}}/api/emails?page=1&pageSize=20
-X-API-Key: {{apiKey}}
+### List messages, newest first
+GET {{host}}/v1/messages?limit=20
+Authorization: Bearer {{apiKey}}
 
-### Send to several recipients
-POST {{host}}/api/emails/send-bulk
-X-API-Key: {{apiKey}}
+### Missing key -> 401 ProblemDetails
+GET {{host}}/v1/messages
+
+### Header injection -> 400 ValidationProblem
+POST {{host}}/v1/messages
+Authorization: Bearer {{apiKey}}
 Content-Type: application/json
 
 {
-  "to": ["a@example.test", "b@example.test"],
-  "subject": "Bulk hello",
-  "body": "Plain text body",
-  "isHtml": false
+  "to": ["recipient@example.test"],
+  "subject": "Hi\r\nBcc: victim@example.test",
+  "text": "x"
 }
 
-### Missing key -> 401
-GET {{host}}/api/emails
-
-### Validation error -> 400
-POST {{host}}/api/emails/send
-X-API-Key: {{apiKey}}
-Content-Type: application/json
-
-{
-  "to": "",
-  "subject": "No recipient"
-}
+### OpenAPI document (browse {{host}}/docs for the Scalar reference)
+GET {{host}}/openapi/v1.json
