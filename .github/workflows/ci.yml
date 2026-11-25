@@ -29,6 +29,9 @@ jobs:
           cache: true
           cache-dependency-path: '**/packages.lock.json'
 
+      - name: Secret scan (working tree)
+        run: docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1 dir /repo --no-banner --redact
+
       - name: Restore
         run: dotnet restore Relay.slnx
 

@@ -11,7 +11,8 @@ namespace Relay.IntegrationTests;
 /// <summary>Test signing material for Resend (Svix HMAC) and SES (SNS RSA). Never real secrets.</summary>
 public static class TestSigning
 {
-    public const string ResendSecret = "whsec_dGVzdC1vbmx5LXNlY3JldC1ub3QtcmVhbA==";
+    /// <summary>Random per test run, so no key-shaped literal ever lives in the repo.</summary>
+    public static string ResendSecret { get; } = "whsec_" + Convert.ToBase64String(RandomNumberGenerator.GetBytes(24));
     public const string TopicArn = "arn:aws:sns:us-east-1:000000000000:relay-test";
 
     private static readonly RSA Key = RSA.Create(2048);

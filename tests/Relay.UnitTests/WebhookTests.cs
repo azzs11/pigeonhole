@@ -8,7 +8,8 @@ namespace Relay.UnitTests;
 
 public class ResendWebhookTests
 {
-    private const string Secret = "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw";
+    // Random per run: no key-shaped literal in the repo.
+    private static readonly string Secret = "whsec_" + Convert.ToBase64String(RandomNumberGenerator.GetBytes(24));
     private static readonly DateTimeOffset Now = new(2026, 11, 25, 12, 0, 0, TimeSpan.Zero);
     private static readonly string Ts = Now.ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
     private const string Body = """{"type":"email.delivered","data":{"email_id":"re_1"}}""";
