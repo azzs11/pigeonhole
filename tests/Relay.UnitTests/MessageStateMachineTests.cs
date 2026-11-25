@@ -10,7 +10,7 @@ public class MessageStateMachineTests
     private static Message NewMessage() => Message.Accept(
         Guid.CreateVersion7(T0), Guid.NewGuid(),
         new MessageDraft("from@relay.test", ["to@example.test"], [], [], "Hi", "Body", null),
-        null, null, T0);
+        null, null, "relay.test", T0);
 
     [Fact]
     public void Accept_starts_in_Accepted_with_one_event()
@@ -72,5 +72,25 @@ public class MessageStateMachineTests
     {
         Message.CanTransition(MessageStatus.Delivered, MessageStatus.DeadLettered).ShouldBeFalse();
         Message.CanTransition(MessageStatus.DeadLettered, MessageStatus.Delivered).ShouldBeFalse();
+    }
+}
+
+public class BackoffTests
+{
+    private static readonly Relay.Application.DeliveryOptions Options = new() { BackoffBaseSeconds = 30, BackoffMaxSeconds = 600 };
+
+    [Theory]
+    [InlineData(1, 30)]
+    [InlineData(2, 60)]
+    [InlineData(3, 120)]
+    [InlineData(10, 600)]
+    public void Doubles_per_attempt_and_caps(int attempt, int expectedSeconds) =>
+        Relay.Application.Backoff.ForAttempt(attempt, Options, 0.5).TotalSeconds.ShouldBe(expectedSeconds);
+
+    [Fact]
+    public void Jitter_stays_within_twenty_percent()
+    {
+        Relay.Application.Backoff.ForAttempt(1, Options, 0).TotalSeconds.ShouldBe(24);
+        Relay.Application.Backoff.ForAttempt(1, Options, 1).TotalSeconds.ShouldBe(36, tolerance: 1e-9);
     }
 }

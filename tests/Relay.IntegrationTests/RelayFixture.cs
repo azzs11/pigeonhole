@@ -1,4 +1,6 @@
 using System.Net.Http.Headers;
+using DotNet.Testcontainers.Builders;
+using DotNet.Testcontainers.Containers;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -30,12 +32,21 @@ public sealed class RelayApiFactory(string connectionString) : WebApplicationFac
 public sealed class RelayFixture : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine").Build();
+    private readonly IContainer _mailpit = new ContainerBuilder("axllent/mailpit:v1.34.0")
+        .WithPortBinding(1025, true)
+        .WithPortBinding(8025, true)
+        .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(r => r.ForPort(8025).ForPath("/livez")))
+        .Build();
 
     public RelayApiFactory Factory { get; private set; } = null!;
 
+    public string MailpitHost => _mailpit.Hostname;
+    public int MailpitSmtpPort => _mailpit.GetMappedPublicPort(1025);
+    public Uri MailpitApi => new($"http://{_mailpit.Hostname}:{_mailpit.GetMappedPublicPort(8025)}/");
+
     public async Task InitializeAsync()
     {
-        await _postgres.StartAsync();
+        await Task.WhenAll(_postgres.StartAsync(), _mailpit.StartAsync());
         Factory = new RelayApiFactory(_postgres.GetConnectionString());
         await WithDbAsync(db => db.Database.MigrateAsync());
     }
@@ -44,6 +55,7 @@ public sealed class RelayFixture : IAsyncLifetime
     {
         await Factory.DisposeAsync();
         await _postgres.DisposeAsync();
+        await _mailpit.DisposeAsync();
     }
 
     public async Task WithDbAsync(Func<RelayDbContext, Task> action)

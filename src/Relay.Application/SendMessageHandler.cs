@@ -44,7 +44,7 @@ public sealed class SendMessageHandler(IMessageRepository messages, MessagingOpt
         }
 
         var now = time.GetUtcNow();
-        var message = Message.Accept(Guid.CreateVersion7(now), tenantId, draft, idempotencyKey, requestHash, now);
+        var message = Message.Accept(Guid.CreateVersion7(now), tenantId, draft, idempotencyKey, requestHash, options.MessageIdDomain, now);
         var winner = await messages.AddAcceptedAsync(message, cancellationToken);
 
         // A concurrent request with the same key got there first.

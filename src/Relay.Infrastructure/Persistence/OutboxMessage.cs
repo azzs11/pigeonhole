@@ -15,4 +15,7 @@ public sealed class OutboxMessage
     public string? LockedBy { get; set; }
     public DateTimeOffset? LockedUntil { get; set; }
     public DateTimeOffset? ProcessedAt { get; set; }
+
+    /// <summary>Set after an unknown outcome on an idempotent provider: retry only there.</summary>
+    public string? PinnedProvider { get; set; }
 }

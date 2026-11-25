@@ -33,6 +33,10 @@ public sealed class Message
     public MessageStatus Status { get; private set; }
     public string? IdempotencyKey { get; private set; }
     public string? RequestHash { get; private set; }
+    /// <summary>Deterministic RFC 5322 Message-ID, the same on every send attempt.</summary>
+    public string InternetMessageId { get; private set; } = string.Empty;
+    public string? ProviderName { get; private set; }
+    public string? ProviderMessageId { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
     public IReadOnlyList<MessageEvent> Events => _events;
@@ -43,7 +47,7 @@ public sealed class Message
         Allowed.TryGetValue(from, out var next) && next.Contains(to);
 
     public static Message Accept(
-        Guid id, Guid tenantId, MessageDraft draft, string? idempotencyKey, string? requestHash, DateTimeOffset now)
+        Guid id, Guid tenantId, MessageDraft draft, string? idempotencyKey, string? requestHash, string messageIdDomain, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(draft);
         if (tenantId == Guid.Empty)
@@ -70,11 +74,19 @@ public sealed class Message
             Status = MessageStatus.Accepted,
             IdempotencyKey = idempotencyKey,
             RequestHash = requestHash,
+            InternetMessageId = $"<{id:N}@{messageIdDomain}>",
             CreatedAt = now,
             UpdatedAt = now,
         };
         message._events.Add(new MessageEvent(id, 1, null, MessageStatus.Accepted, now, "Accepted"));
         return message;
+    }
+
+    /// <summary>Records which provider handled the latest attempt (and its id, once known).</summary>
+    public void RecordProvider(string providerName, string? providerMessageId)
+    {
+        ProviderName = providerName;
+        ProviderMessageId = providerMessageId;
     }
 
     public TransitionResult Transition(MessageStatus to, DateTimeOffset at, string? detail = null)

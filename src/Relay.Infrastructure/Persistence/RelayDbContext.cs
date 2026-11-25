@@ -18,12 +18,20 @@ public sealed class RelayDbContext(DbContextOptions<RelayDbContext> options) : D
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
+
         modelBuilder.Entity<Tenant>(ConfigureTenant);
         modelBuilder.Entity<ApiKey>(ConfigureApiKey);
         modelBuilder.Entity<Message>(ConfigureMessage);
         modelBuilder.Entity<MessageEvent>(ConfigureMessageEvent);
         modelBuilder.Entity<OutboxMessage>(ConfigureOutbox);
         modelBuilder.Entity<Suppression>(ConfigureSuppression);
+
+        // Ids are created in code (Guid v7). Without this, EF treats a new child with a set key
+        // (e.g. an appended MessageEvent) as an existing row and issues an UPDATE.
+        foreach (var entity in modelBuilder.Model.GetEntityTypes())
+        {
+            entity.FindPrimaryKey()?.Properties.Single().ValueGenerated = Microsoft.EntityFrameworkCore.Metadata.ValueGenerated.Never;
+        }
     }
 
     private static void ConfigureTenant(EntityTypeBuilder<Tenant> b)
@@ -49,6 +57,14 @@ public sealed class RelayDbContext(DbContextOptions<RelayDbContext> options) : D
         b.Property(m => m.Status).HasConversion<string>().HasMaxLength(32);
         b.Property(m => m.IdempotencyKey).HasMaxLength(255);
         b.Property(m => m.RequestHash).HasMaxLength(64).IsFixedLength();
+        b.Property(m => m.InternetMessageId).HasMaxLength(300);
+        b.Property(m => m.ProviderName).HasMaxLength(100);
+        b.Property(m => m.ProviderMessageId).HasMaxLength(300);
+        b.HasIndex(m => m.InternetMessageId).IsUnique();
+        b.HasIndex(m => new { m.ProviderName, m.ProviderMessageId });
+
+        // Optimistic concurrency on PostgreSQL's xmin: two workers can never both write one message.
+        b.Property<uint>("Version").IsRowVersion();
         b.HasIndex(m => new { m.TenantId, m.IdempotencyKey }).IsUnique().HasDatabaseName(IdempotencyIndex);
         b.HasIndex(m => new { m.TenantId, m.Id }).IsDescending(false, true);
         b.HasOne<Tenant>().WithMany().HasForeignKey(m => m.TenantId);
@@ -68,6 +84,8 @@ public sealed class RelayDbContext(DbContextOptions<RelayDbContext> options) : D
     {
         b.ToTable("outbox");
         b.Property(o => o.LockedBy).HasMaxLength(100);
+        b.Property(o => o.LockedBy).IsConcurrencyToken();
+        b.Property(o => o.PinnedProvider).HasMaxLength(100);
         b.HasIndex(o => o.MessageId).IsUnique();
         b.HasIndex(o => o.AvailableAt).HasFilter("processed_at IS NULL");
         b.HasOne<Message>().WithMany().HasForeignKey(o => o.MessageId);

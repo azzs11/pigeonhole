@@ -10,4 +10,7 @@ public sealed record MessagingOptions
     public int MaxSubjectLength { get; init; } = 998;
     public int MaxBodyBytes { get; init; } = 512 * 1024;
     public int MaxIdempotencyKeyLength { get; init; } = 255;
+
+    /// <summary>Right-hand side of generated Message-IDs, e.g. the sending domain.</summary>
+    public string MessageIdDomain { get; init; } = "relay.test";
 }

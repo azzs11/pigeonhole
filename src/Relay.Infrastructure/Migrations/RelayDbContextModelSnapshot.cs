@@ -25,7 +25,6 @@ namespace Relay.Infrastructure.Migrations
             modelBuilder.Entity("Relay.Domain.ApiKey", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -81,7 +80,6 @@ namespace Relay.Infrastructure.Migrations
             modelBuilder.Entity("Relay.Domain.Message", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -113,6 +111,22 @@ namespace Relay.Infrastructure.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
                         .HasColumnName("idempotency_key");
+
+                    b.Property<string>("InternetMessageId")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("internet_message_id");
+
+                    b.Property<string>("ProviderMessageId")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("provider_message_id");
+
+                    b.Property<string>("ProviderName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("provider_name");
 
                     b.Property<string>("RequestHash")
                         .HasMaxLength(64)
@@ -149,8 +163,21 @@ namespace Relay.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.HasKey("Id")
                         .HasName("pk_messages");
+
+                    b.HasIndex("InternetMessageId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_messages_internet_message_id");
+
+                    b.HasIndex("ProviderName", "ProviderMessageId")
+                        .HasDatabaseName("ix_messages_provider_name_provider_message_id");
 
                     b.HasIndex("TenantId", "Id")
                         .IsDescending(false, true)
@@ -166,7 +193,6 @@ namespace Relay.Infrastructure.Migrations
             modelBuilder.Entity("Relay.Domain.MessageEvent", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -211,7 +237,6 @@ namespace Relay.Infrastructure.Migrations
             modelBuilder.Entity("Relay.Domain.Suppression", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -248,7 +273,6 @@ namespace Relay.Infrastructure.Migrations
             modelBuilder.Entity("Relay.Domain.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -279,7 +303,6 @@ namespace Relay.Infrastructure.Migrations
             modelBuilder.Entity("Relay.Infrastructure.Persistence.OutboxMessage", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -296,6 +319,7 @@ namespace Relay.Infrastructure.Migrations
                         .HasColumnName("created_at");
 
                     b.Property<string>("LockedBy")
+                        .IsConcurrencyToken()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("locked_by");
@@ -307,6 +331,11 @@ namespace Relay.Infrastructure.Migrations
                     b.Property<Guid>("MessageId")
                         .HasColumnType("uuid")
                         .HasColumnName("message_id");
+
+                    b.Property<string>("PinnedProvider")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("pinned_provider");
 
                     b.Property<DateTimeOffset?>("ProcessedAt")
                         .HasColumnType("timestamp with time zone")

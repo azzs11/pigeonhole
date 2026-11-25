@@ -19,5 +19,11 @@ services:
       timeout: 3s
       retries: 30
 
+  mailpit:
+    image: axllent/mailpit:v1.34.0
+    ports:
+      - "1025:1025" # SMTP sink: nothing leaves this container
+      - "8025:8025" # web UI and API: http://localhost:8025
+
 volumes:
   pgdata:
