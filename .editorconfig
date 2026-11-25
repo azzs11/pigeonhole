@@ -69,6 +69,14 @@ dotnet_diagnostic.CA1303.severity = none
 [src/Relay.Infrastructure/Migrations/**.cs]
 generated_code = true
 
+[bench/**.cs]
+# Fault injection needs a seeded, reproducible PRNG, not a cryptographic one.
+dotnet_diagnostic.CA5394.severity = none
+# The harness must survive any injected failure and keep measuring.
+dotnet_diagnostic.CA1031.severity = none
+# Background tasks are always awaited before the service provider is disposed.
+dotnet_diagnostic.CA2025.severity = none
+
 [tests/**.cs]
 # HttpClient string overloads are idiomatic in tests.
 dotnet_diagnostic.CA2234.severity = none
