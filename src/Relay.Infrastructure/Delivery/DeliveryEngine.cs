@@ -55,6 +55,15 @@ public sealed partial class DeliveryEngine(
 
         var message = await db.Messages.Include(m => m.Events).SingleAsync(m => m.Id == entry.MessageId, cancellationToken);
         var now = time.GetUtcNow();
+        if (message.Status is MessageStatus.Accepted or MessageStatus.Unknown
+            && await db.Tenants.AnyAsync(t => t.Id == message.TenantId && t.SendingPausedAt != null, cancellationToken))
+        {
+            // Paused by the reputation guard or an operator: hold without using an attempt.
+            Reschedule(entry, now + TimeSpan.FromMinutes(15), entry.PinnedProvider);
+            await db.SaveChangesAsync(cancellationToken);
+            return;
+        }
+
         switch (message.Status)
         {
             case MessageStatus.Sending:
@@ -73,6 +82,18 @@ public sealed partial class DeliveryEngine(
                 Complete(entry, now);
                 await db.SaveChangesAsync(cancellationToken);
                 return;
+        }
+
+        var recipients = message.To.Concat(message.Cc).Concat(message.Bcc).Select(EmailAddress.Normalize).ToList();
+        var suppressed = await db.Suppressions.CountAsync(
+            s => s.TenantId == message.TenantId && recipients.Contains(s.Address), cancellationToken);
+        if (suppressed > 0)
+        {
+            // Suppressed after it was accepted: never call a provider.
+            message.Transition(MessageStatus.Rejected, now, $"{suppressed} recipient(s) suppressed; not sent");
+            Complete(entry, now);
+            await db.SaveChangesAsync(cancellationToken);
+            return;
         }
 
         entry.Attempts++;

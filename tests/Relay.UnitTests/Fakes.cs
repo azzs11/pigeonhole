@@ -6,27 +6,50 @@ namespace Relay.UnitTests;
 internal sealed class FakeMessageRepository : IMessageRepository
 {
     public List<Message> Saved { get; } = [];
+    public int QuotaLimit { get; set; } = int.MaxValue;
+    public int QuotaUsed { get; private set; }
+    public string? PausedReason { get; set; }
 
-    public Task<Message?> AddAcceptedAsync(Message message, CancellationToken cancellationToken)
+    public Task<AddResult> AddAcceptedAsync(IReadOnlyList<Message> messages, int quotaUnits, CancellationToken cancellationToken)
     {
-        var existing = Saved.FirstOrDefault(m => m.TenantId == message.TenantId
-            && message.IdempotencyKey is not null && m.IdempotencyKey == message.IdempotencyKey);
-        if (existing is null)
+        if (PausedReason is not null)
         {
-            Saved.Add(message);
+            return Task.FromResult<AddResult>(new AddPaused(PausedReason));
         }
 
-        return Task.FromResult(existing);
+        if (QuotaUsed + quotaUnits > QuotaLimit)
+        {
+            return Task.FromResult<AddResult>(new AddQuotaExceeded(TimeSpan.FromHours(1)));
+        }
+
+        QuotaUsed += quotaUnits;
+        Saved.AddRange(messages);
+        return Task.FromResult<AddResult>(new AddSucceeded());
     }
 
     public Task<Message?> FindAsync(Guid tenantId, Guid messageId, CancellationToken cancellationToken) =>
         Task.FromResult(Saved.FirstOrDefault(m => m.TenantId == tenantId && m.Id == messageId));
 
-    public Task<Message?> FindByIdempotencyKeyAsync(Guid tenantId, string idempotencyKey, CancellationToken cancellationToken) =>
-        Task.FromResult(Saved.FirstOrDefault(m => m.TenantId == tenantId && m.IdempotencyKey == idempotencyKey));
+    public Task<IReadOnlyList<Message>> FindByIdempotencyKeyAsync(Guid tenantId, string idempotencyKey, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Message>>([.. Saved.Where(m => m.TenantId == tenantId
+            && (m.IdempotencyKey == idempotencyKey || (m.IdempotencyKey?.StartsWith(idempotencyKey + "#", StringComparison.Ordinal) ?? false)))]);
 
     public Task<IReadOnlyList<Message>> ListAsync(Guid tenantId, Guid? before, int limit, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<Message>>([.. Saved.Where(m => m.TenantId == tenantId)]);
+}
+
+internal sealed class FakeSuppressionStore : ISuppressionStore
+{
+    public HashSet<string> Addresses { get; } = new(StringComparer.Ordinal);
+
+    public Task<IReadOnlyList<string>> FindSuppressedAsync(Guid tenantId, IEnumerable<string> addresses, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<string>>([.. addresses.Select(EmailAddress.Normalize).Where(Addresses.Contains).Distinct()]);
+
+    public Task<IReadOnlyList<Suppression>> ListAsync(Guid tenantId, int limit, string? after, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Suppression>>([]);
+
+    public Task<bool> RemoveAsync(Guid tenantId, string address, CancellationToken cancellationToken) =>
+        Task.FromResult(Addresses.Remove(EmailAddress.Normalize(address)));
 }
 
 internal sealed class FakeKeyStores : IApiKeyStore, ITenantStore

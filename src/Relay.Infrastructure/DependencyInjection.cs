@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Relay.Application;
 using Relay.Infrastructure.Delivery;
 using Relay.Infrastructure.Persistence;
+using Relay.Infrastructure.Webhooks;
 
 namespace Relay.Infrastructure;
 
@@ -26,6 +27,7 @@ public static class DependencyInjection
         services.AddScoped<IMessageRepository, MessageRepository>();
         services.AddScoped<IApiKeyStore, ApiKeyStore>();
         services.AddScoped<ITenantStore, TenantStore>();
+        services.AddScoped<ISuppressionStore, SuppressionStore>();
         services.AddScoped<SendMessageHandler>();
         services.AddScoped<ApiKeyService>();
         return services;
@@ -57,6 +59,19 @@ public static class DependencyInjection
             });
         }
 
+        return services;
+    }
+
+    /// <summary>Provider webhooks (Resend/Svix, SES/SNS) and the reputation guard.</summary>
+    public static IServiceCollection AddRelayWebhooks(
+        this IServiceCollection services, WebhookOptions webhooks, ReputationOptions reputation)
+    {
+        services.AddSingleton(webhooks);
+        services.AddSingleton(reputation);
+        services.AddHttpClient(nameof(HttpSnsGateway));
+        services.TryAddSingleton<ISnsGateway, HttpSnsGateway>();
+        services.AddScoped<ReputationGuard>();
+        services.AddScoped<DeliveryEventProcessor>();
         return services;
     }
 

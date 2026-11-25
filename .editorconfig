@@ -74,6 +74,8 @@ generated_code = true
 dotnet_diagnostic.CA2234.severity = none
 # Inline constant arrays in test data are fine.
 dotnet_diagnostic.CA1861.severity = none
+# Theory data passes URLs as strings.
+dotnet_diagnostic.CA1054.severity = none
 # Test method names use underscores: Method_Condition_Result.
 dotnet_diagnostic.CA1707.severity = none
 # Test classes must be public for xUnit.

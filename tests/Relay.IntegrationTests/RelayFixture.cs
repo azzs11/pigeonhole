@@ -3,11 +3,13 @@ using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Relay.Application;
 using Relay.Infrastructure.Persistence;
+using Relay.Infrastructure.Webhooks;
 using Testcontainers.PostgreSql;
 
 namespace Relay.IntegrationTests;
@@ -18,20 +20,35 @@ public sealed class RelayTestGroup : ICollectionFixture<RelayFixture>
     public const string Name = "relay";
 }
 
-public sealed class RelayApiFactory(string connectionString) : WebApplicationFactory<Program>
+public sealed class RelayApiFactory(string connectionString, IReadOnlyDictionary<string, string?>? settings = null)
+    : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.UseEnvironment("Testing");
         builder.UseSetting("ConnectionStrings:Relay", connectionString);
+        builder.UseSetting("Relay:RateLimit:PermitsPerSecond", "100000");
+        builder.UseSetting("Relay:RateLimit:Burst", "100000");
+        builder.UseSetting("Relay:RateLimit:AnonymousPermitsPerSecond", "100000");
+        builder.UseSetting("Relay:RateLimit:AnonymousBurst", "100000");
+        builder.UseSetting("Relay:Webhooks:Resend:SigningSecret", TestSigning.ResendSecret);
+        builder.UseSetting("Relay:Webhooks:Ses:AllowedTopicArns:0", TestSigning.TopicArn);
+        foreach (var (key, value) in settings ?? new Dictionary<string, string?>())
+        {
+            builder.UseSetting(key, value);
+        }
+
+        builder.ConfigureTestServices(s => s.AddSingleton<ISnsGateway>(TestSigning.Sns));
     }
 }
 
 /// <summary>One PostgreSQL container and one migrated database shared by the collection.</summary>
 public sealed class RelayFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine").Build();
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
+        .WithCommand("-c", "max_connections=500")
+        .Build();
     private readonly IContainer _mailpit = new ContainerBuilder("axllent/mailpit:v1.34.0")
         .WithPortBinding(1025, true)
         .WithPortBinding(8025, true)
@@ -39,6 +56,8 @@ public sealed class RelayFixture : IAsyncLifetime
         .Build();
 
     public RelayApiFactory Factory { get; private set; } = null!;
+
+    public string ConnectionString => _postgres.GetConnectionString();
 
     public string MailpitHost => _mailpit.Hostname;
     public int MailpitSmtpPort => _mailpit.GetMappedPublicPort(1025);

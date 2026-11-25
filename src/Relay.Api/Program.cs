@@ -7,19 +7,26 @@ using Relay.Api.Endpoints;
 using Relay.Application;
 using Relay.Infrastructure;
 using Relay.Infrastructure.Persistence;
+using Relay.Infrastructure.Webhooks;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
+var config = builder.Configuration;
 
-var connectionString = builder.Configuration.GetConnectionString("Relay")
+var connectionString = config.GetConnectionString("Relay")
     ?? throw new InvalidOperationException("ConnectionStrings:Relay is not configured.");
-var messaging = builder.Configuration.GetSection(MessagingOptions.Section).Get<MessagingOptions>() ?? new MessagingOptions();
-builder.Services.AddRelayCore(connectionString, messaging);
+builder.Services
+    .AddRelayCore(connectionString, config.GetSection(MessagingOptions.Section).Get<MessagingOptions>() ?? new())
+    .AddRelayDelivery(config.GetSection(DeliveryOptions.Section).Get<DeliveryOptions>() ?? new())
+    .AddRelayWebhooks(
+        config.GetSection(WebhookOptions.Section).Get<WebhookOptions>() ?? new(),
+        config.GetSection(ReputationOptions.Section).Get<ReputationOptions>() ?? new());
 
 builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = ProblemDetailsDefaults.AddTraceId);
 builder.Services.AddExceptionHandler<UnhandledExceptionHandler>();
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddOpenApi();
+builder.Services.AddRelayRateLimiting(config.GetSection(RateLimitOptions.Section).Get<RateLimitOptions>() ?? new());
 
 builder.Services
     .AddAuthentication(ApiKeyAuthenticationHandler.SchemeName)
@@ -39,11 +46,14 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapOpenApi().AllowAnonymous();
 app.MapScalarApiReference("/docs").AllowAnonymous();
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" })).AllowAnonymous().ExcludeFromDescription();
 app.MapMessageEndpoints();
+app.MapSuppressionEndpoints();
+app.MapWebhookEndpoints();
 
 await app.RunAsync();

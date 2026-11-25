@@ -121,13 +121,13 @@ public class RegressionTests(RelayFixture fixture)
     {
         public const string Secret = "Password=hunter2";
 
-        public Task<Message?> AddAcceptedAsync(Message message, CancellationToken cancellationToken) =>
+        public Task<AddResult> AddAcceptedAsync(IReadOnlyList<Message> messages, int quotaUnits, CancellationToken cancellationToken) =>
             throw new InvalidOperationException($"connection failed: {Secret}");
 
         public Task<Message?> FindAsync(Guid tenantId, Guid messageId, CancellationToken cancellationToken) =>
             throw new InvalidOperationException(Secret);
 
-        public Task<Message?> FindByIdempotencyKeyAsync(Guid tenantId, string idempotencyKey, CancellationToken cancellationToken) =>
+        public Task<IReadOnlyList<Message>> FindByIdempotencyKeyAsync(Guid tenantId, string idempotencyKey, CancellationToken cancellationToken) =>
             throw new InvalidOperationException(Secret);
 
         public Task<IReadOnlyList<Message>> ListAsync(Guid tenantId, Guid? before, int limit, CancellationToken cancellationToken) =>

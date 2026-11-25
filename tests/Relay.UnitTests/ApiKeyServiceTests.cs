@@ -8,7 +8,7 @@ public class ApiKeyServiceTests
     private readonly FakeKeyStores _stores = new();
     private readonly ApiKeyService _service;
 
-    public ApiKeyServiceTests() => _service = new ApiKeyService(_stores, _stores, TimeProvider.System);
+    public ApiKeyServiceTests() => _service = new ApiKeyService(_stores, _stores, new MessagingOptions(), TimeProvider.System);
 
     [Fact]
     public async Task Issued_key_is_stored_only_as_hash_and_prefix()

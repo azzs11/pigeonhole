@@ -76,7 +76,14 @@ public sealed class DeliveryHarness : IAsyncDisposable
         await action(scope.ServiceProvider.GetRequiredService<RelayDbContext>());
     }
 
-    public ValueTask DisposeAsync() => Services.DisposeAsync();
+    public async ValueTask DisposeAsync()
+    {
+        await Services.DisposeAsync();
+
+        // Each harness has its own database; release its idle connections.
+        await using var connection = new Npgsql.NpgsqlConnection(ConnectionString);
+        Npgsql.NpgsqlConnection.ClearPool(connection);
+    }
 }
 
 /// <summary>Returns scripted outcomes in order (repeating the last one) and counts calls.</summary>

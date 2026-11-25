@@ -213,3 +213,27 @@ public class DeliveryEngineTests(RelayFixture fixture)
         perWorker.Count(x => x.Count > 0).ShouldBeGreaterThan(1, "work should spread across workers");
     }
 }
+
+[Collection(RelayTestGroup.Name)]
+public class DeliverySuppressionTests(RelayFixture fixture)
+{
+    [Fact]
+    public async Task Recipient_suppressed_after_accept_is_rejected_without_calling_a_provider()
+    {
+        var provider = new ScriptedProvider("p", false, ProviderOutcome.Sent("p"));
+        await using var h = await DeliveryHarness.CreateAsync(
+            fixture, new DeliveryOptions(), s => s.AddSingleton<IEmailProvider>(provider));
+        var id = await h.AcceptAsync();
+        await h.WithDbAsync(async db =>
+        {
+            var m = await db.Messages.SingleAsync(x => x.Id == id);
+            db.Suppressions.Add(Suppression.Create(Guid.NewGuid(), m.TenantId, "to@example.test", SuppressionReason.Manual, DateTimeOffset.UtcNow));
+            await db.SaveChangesAsync();
+        });
+
+        await h.Engine.RunOnceAsync(default);
+
+        (await h.LoadAsync(id)).Message.Status.ShouldBe(MessageStatus.Rejected);
+        provider.Calls.ShouldBe(0);
+    }
+}

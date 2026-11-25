@@ -13,11 +13,12 @@ internal static class MessageEndpoints
     {
         var group = app.MapGroup("/v1/messages").WithTags("Messages");
         group.MapPost("/", Send).RequireAuthorization(Scopes.MessagesSend);
+        group.MapPost("/bulk", SendBulk).RequireAuthorization(Scopes.MessagesSend);
         group.MapGet("/{id:guid}", Get).RequireAuthorization(Scopes.MessagesRead);
         group.MapGet("/", List).RequireAuthorization(Scopes.MessagesRead);
     }
 
-    private static async Task<Results<Accepted<MessageResponse>, ValidationProblem, ProblemHttpResult>> Send(
+    private static async Task<IResult> Send(
         SendMessageRequest request,
         [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         ClaimsPrincipal user,
@@ -26,21 +27,58 @@ internal static class MessageEndpoints
         CancellationToken cancellationToken)
     {
         var outcome = await handler.HandleAsync(user.TenantId(), request, idempotencyKey, cancellationToken);
+        return ToResult(outcome, response, accepted => TypedResults.Accepted(
+            $"/v1/messages/{accepted.Message.Id}", MessageResponse.Create(accepted.Message)));
+    }
+
+    private static async Task<IResult> SendBulk(
+        SendBulkRequest request,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        ClaimsPrincipal user,
+        HttpResponse response,
+        SendMessageHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var outcome = await handler.HandleBulkAsync(user.TenantId(), request, idempotencyKey, cancellationToken);
+        return ToResult(outcome, response, accepted => TypedResults.Accepted(
+            (string?)null, new BulkResponse([.. accepted.Messages.Select(MessageResponse.Create)])));
+    }
+
+    private static IResult ToResult(SendOutcome outcome, HttpResponse response, Func<SendAccepted, IResult> accepted)
+    {
         switch (outcome)
         {
-            case SendAccepted accepted:
-                if (accepted.Replayed)
+            case SendAccepted ok:
+                if (ok.Replayed)
                 {
                     response.Headers["Idempotent-Replayed"] = "true";
                 }
 
-                return TypedResults.Accepted($"/v1/messages/{accepted.Message.Id}", MessageResponse.Create(accepted.Message));
+                return accepted(ok);
             case SendInvalid invalid:
                 return TypedResults.ValidationProblem(invalid.Errors);
             case SendIdempotencyConflict:
                 return TypedResults.Problem(
                     statusCode: StatusCodes.Status422UnprocessableEntity,
                     title: "Idempotency-Key was already used with a different request.");
+            case SendSuppressed suppressed:
+                return TypedResults.Problem(
+                    statusCode: StatusCodes.Status422UnprocessableEntity,
+                    title: "Some recipients are on the suppression list.",
+                    detail: "Nothing was accepted. Remove them, or delete the suppression if it is wrong.",
+                    extensions: new Dictionary<string, object?> { ["suppressed"] = suppressed.Addresses });
+            case SendQuotaExceeded quota:
+                response.Headers.RetryAfter = Math.Max(1, (int)Math.Ceiling(quota.RetryAfter.TotalSeconds))
+                    .ToString(System.Globalization.CultureInfo.InvariantCulture);
+                return TypedResults.Problem(
+                    statusCode: StatusCodes.Status429TooManyRequests,
+                    title: "Daily recipient quota exceeded.",
+                    detail: "The quota resets at 00:00 UTC. See Retry-After.");
+            case SendPaused paused:
+                return TypedResults.Problem(
+                    statusCode: StatusCodes.Status403Forbidden,
+                    title: "Sending is paused for this tenant.",
+                    detail: paused.Reason);
             default:
                 throw new InvalidOperationException($"Unhandled outcome {outcome.GetType().Name}.");
         }
@@ -88,3 +126,5 @@ internal sealed record MessageDetailsResponse(MessageResponse Message, IReadOnly
 }
 
 internal sealed record MessagePage(IReadOnlyList<MessageResponse> Items, Guid? NextBefore);
+
+internal sealed record BulkResponse(IReadOnlyList<MessageResponse> Messages);

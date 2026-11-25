@@ -8,11 +8,11 @@ public sealed class Message
 {
     private static readonly Dictionary<MessageStatus, MessageStatus[]> Allowed = new()
     {
-        [MessageStatus.Accepted] = [MessageStatus.Sending, MessageStatus.Held],
+        [MessageStatus.Accepted] = [MessageStatus.Sending, MessageStatus.Held, MessageStatus.Rejected],
         [MessageStatus.Held] = [MessageStatus.Accepted, MessageStatus.Rejected],
         [MessageStatus.Sending] = [MessageStatus.Sent, MessageStatus.Unknown, MessageStatus.Accepted, MessageStatus.DeadLettered],
         [MessageStatus.Unknown] = [MessageStatus.Sent, MessageStatus.Accepted, MessageStatus.DeadLettered],
-        [MessageStatus.Sent] = [MessageStatus.Delivered, MessageStatus.Bounced],
+        [MessageStatus.Sent] = [MessageStatus.Delivered, MessageStatus.Bounced, MessageStatus.Accepted],
     };
 
     private readonly List<MessageEvent> _events = [];
@@ -87,6 +87,13 @@ public sealed class Message
     {
         ProviderName = providerName;
         ProviderMessageId = providerMessageId;
+    }
+
+    /// <summary>Adds a timeline entry without changing state (e.g. a complaint after delivery).</summary>
+    public void Annotate(string detail, DateTimeOffset at)
+    {
+        UpdatedAt = at;
+        _events.Add(new MessageEvent(Id, _events.Count + 1, Status, Status, at, detail));
     }
 
     public TransitionResult Transition(MessageStatus to, DateTimeOffset at, string? detail = null)

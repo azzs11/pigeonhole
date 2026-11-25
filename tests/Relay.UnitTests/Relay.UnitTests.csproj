@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Relay.Application\Relay.Application.csproj" />
+    <ProjectReference Include="..\..\src\Relay.Infrastructure\Relay.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

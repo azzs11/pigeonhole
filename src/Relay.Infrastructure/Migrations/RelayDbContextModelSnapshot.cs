@@ -176,8 +176,8 @@ namespace Relay.Infrastructure.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_messages_internet_message_id");
 
-                    b.HasIndex("ProviderName", "ProviderMessageId")
-                        .HasDatabaseName("ix_messages_provider_name_provider_message_id");
+                    b.HasIndex("ProviderMessageId")
+                        .HasDatabaseName("ix_messages_provider_message_id");
 
                     b.HasIndex("TenantId", "Id")
                         .IsDescending(false, true)
@@ -280,6 +280,10 @@ namespace Relay.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<int>("DailyQuota")
+                        .HasColumnType("integer")
+                        .HasColumnName("daily_quota");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
@@ -289,6 +293,23 @@ namespace Relay.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("name");
+
+                    b.Property<string>("PauseReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("pause_reason");
+
+                    b.Property<DateOnly?>("QuotaDay")
+                        .HasColumnType("date")
+                        .HasColumnName("quota_day");
+
+                    b.Property<int>("QuotaUsed")
+                        .HasColumnType("integer")
+                        .HasColumnName("quota_used");
+
+                    b.Property<DateTimeOffset?>("SendingPausedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sending_paused_at");
 
                     b.HasKey("Id")
                         .HasName("pk_tenants");
@@ -357,6 +378,48 @@ namespace Relay.Infrastructure.Migrations
                         .HasDatabaseName("ix_outbox_message_id");
 
                     b.ToTable("outbox", (string)null);
+                });
+
+            modelBuilder.Entity("Relay.Infrastructure.Persistence.ProviderEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("EventId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("event_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid?>("MessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("message_id");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("provider");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_provider_events");
+
+                    b.HasIndex("Provider", "EventId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_provider_events_provider_event_id");
+
+                    b.ToTable("provider_events", (string)null);
                 });
 
             modelBuilder.Entity("Relay.Domain.ApiKey", b =>

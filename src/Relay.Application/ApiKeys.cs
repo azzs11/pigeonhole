@@ -63,7 +63,7 @@ public static class ApiKeyFormat
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(plaintext)));
 }
 
-public sealed class ApiKeyService(IApiKeyStore keys, ITenantStore tenants, TimeProvider time)
+public sealed class ApiKeyService(IApiKeyStore keys, ITenantStore tenants, MessagingOptions options, TimeProvider time)
 {
     private static readonly byte[] DummyHash = new byte[32];
 
@@ -81,7 +81,7 @@ public sealed class ApiKeyService(IApiKeyStore keys, ITenantStore tenants, TimeP
         var tenant = await tenants.FindByNameAsync(tenantName, cancellationToken);
         if (tenant is null)
         {
-            tenant = Tenant.Create(Guid.CreateVersion7(now), tenantName, now);
+            tenant = Tenant.Create(Guid.CreateVersion7(now), tenantName, options.DefaultDailyQuota, now);
             await tenants.AddAsync(tenant, cancellationToken);
         }
 

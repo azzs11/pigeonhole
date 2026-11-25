@@ -7,6 +7,7 @@ namespace Relay.Infrastructure.Persistence;
 public sealed class RelayDbContext(DbContextOptions<RelayDbContext> options) : DbContext(options)
 {
     public const string IdempotencyIndex = "ux_messages_tenant_id_idempotency_key";
+    public const string ProviderEventIndex = "ux_provider_events_provider_event_id";
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
@@ -14,6 +15,7 @@ public sealed class RelayDbContext(DbContextOptions<RelayDbContext> options) : D
     public DbSet<MessageEvent> MessageEvents => Set<MessageEvent>();
     public DbSet<OutboxMessage> Outbox => Set<OutboxMessage>();
     public DbSet<Suppression> Suppressions => Set<Suppression>();
+    public DbSet<ProviderEvent> ProviderEvents => Set<ProviderEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -25,6 +27,7 @@ public sealed class RelayDbContext(DbContextOptions<RelayDbContext> options) : D
         modelBuilder.Entity<MessageEvent>(ConfigureMessageEvent);
         modelBuilder.Entity<OutboxMessage>(ConfigureOutbox);
         modelBuilder.Entity<Suppression>(ConfigureSuppression);
+        modelBuilder.Entity<ProviderEvent>(ConfigureProviderEvent);
 
         // Ids are created in code (Guid v7). Without this, EF treats a new child with a set key
         // (e.g. an appended MessageEvent) as an existing row and issues an UPDATE.
@@ -37,6 +40,8 @@ public sealed class RelayDbContext(DbContextOptions<RelayDbContext> options) : D
     private static void ConfigureTenant(EntityTypeBuilder<Tenant> b)
     {
         b.Property(t => t.Name).HasMaxLength(100);
+        b.Property(t => t.PauseReason).HasMaxLength(500);
+        b.Ignore(t => t.IsSendingPaused);
         b.HasIndex(t => t.Name).IsUnique();
     }
 
@@ -61,7 +66,7 @@ public sealed class RelayDbContext(DbContextOptions<RelayDbContext> options) : D
         b.Property(m => m.ProviderName).HasMaxLength(100);
         b.Property(m => m.ProviderMessageId).HasMaxLength(300);
         b.HasIndex(m => m.InternetMessageId).IsUnique();
-        b.HasIndex(m => new { m.ProviderName, m.ProviderMessageId });
+        b.HasIndex(m => m.ProviderMessageId);
 
         // Optimistic concurrency on PostgreSQL's xmin: two workers can never both write one message.
         b.Property<uint>("Version").IsRowVersion();
@@ -89,6 +94,14 @@ public sealed class RelayDbContext(DbContextOptions<RelayDbContext> options) : D
         b.HasIndex(o => o.MessageId).IsUnique();
         b.HasIndex(o => o.AvailableAt).HasFilter("processed_at IS NULL");
         b.HasOne<Message>().WithMany().HasForeignKey(o => o.MessageId);
+    }
+
+    private static void ConfigureProviderEvent(EntityTypeBuilder<ProviderEvent> b)
+    {
+        b.Property(e => e.Provider).HasMaxLength(50);
+        b.Property(e => e.EventId).HasMaxLength(200);
+        b.Property(e => e.Kind).HasMaxLength(50);
+        b.HasIndex(e => new { e.Provider, e.EventId }).IsUnique().HasDatabaseName(ProviderEventIndex);
     }
 
     private static void ConfigureSuppression(EntityTypeBuilder<Suppression> b)

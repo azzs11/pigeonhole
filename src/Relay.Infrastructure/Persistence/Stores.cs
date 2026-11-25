@@ -5,35 +5,68 @@ using Relay.Domain;
 
 namespace Relay.Infrastructure.Persistence;
 
+internal static class PostgresErrors
+{
+    public static bool IsUniqueViolation(DbUpdateException ex, string constraint) =>
+        ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } pg
+        && string.Equals(pg.ConstraintName, constraint, StringComparison.Ordinal);
+}
+
 internal sealed class MessageRepository(RelayDbContext db) : IMessageRepository
 {
-    public async Task<Message?> AddAcceptedAsync(Message message, CancellationToken cancellationToken)
+    public async Task<AddResult> AddAcceptedAsync(IReadOnlyList<Message> messages, int quotaUnits, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(message);
-        db.Messages.Add(message);
-        db.Outbox.Add(new OutboxMessage
+        ArgumentNullException.ThrowIfNull(messages);
+        var first = messages[0];
+        var now = first.CreatedAt;
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
+
+        await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
+
+        // One statement: resets on a new UTC day, refuses if paused or over quota. Concurrent
+        // requests serialize on the tenant row, so usage can never pass the limit.
+        var used = await db.Database.SqlQuery<int>($"""
+            UPDATE tenants
+            SET quota_used = CASE WHEN quota_day = {today} THEN quota_used + {quotaUnits} ELSE {quotaUnits} END,
+                quota_day = {today}
+            WHERE id = {first.TenantId}
+              AND sending_paused_at IS NULL
+              AND (CASE WHEN quota_day = {today} THEN quota_used ELSE 0 END) + {quotaUnits} <= daily_quota
+            RETURNING quota_used AS "Value"
+            """).ToListAsync(cancellationToken);
+        if (used.Count == 0)
         {
-            Id = Guid.CreateVersion7(message.CreatedAt),
-            MessageId = message.Id,
-            TenantId = message.TenantId,
-            CreatedAt = message.CreatedAt,
-            AvailableAt = message.CreatedAt,
-        });
+            await tx.RollbackAsync(cancellationToken);
+            var tenant = await db.Tenants.AsNoTracking().SingleAsync(t => t.Id == first.TenantId, cancellationToken);
+            return tenant.IsSendingPaused
+                ? new AddPaused(tenant.PauseReason ?? "Sending is paused.")
+                : new AddQuotaExceeded(today.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc) - now.UtcDateTime);
+        }
+
+        db.Messages.AddRange(messages);
+        db.Outbox.AddRange(messages.Select(m => new OutboxMessage
+        {
+            Id = Guid.CreateVersion7(now),
+            MessageId = m.Id,
+            TenantId = m.TenantId,
+            CreatedAt = now,
+            AvailableAt = now,
+        }));
 
         try
         {
-            // One SaveChanges = one transaction: the message and its outbox row commit together.
             await db.SaveChangesAsync(cancellationToken);
-            return null;
+            await tx.CommitAsync(cancellationToken);
+            return new AddSucceeded();
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException
+        catch (DbUpdateException ex) when (PostgresErrors.IsUniqueViolation(ex, RelayDbContext.IdempotencyIndex))
         {
-            SqlState: PostgresErrorCodes.UniqueViolation,
-            ConstraintName: RelayDbContext.IdempotencyIndex,
-        })
-        {
+            // A concurrent request with the same key won; its quota stands, ours rolls back.
+            await tx.RollbackAsync(cancellationToken);
             db.ChangeTracker.Clear();
-            return await FindByIdempotencyKeyAsync(message.TenantId, message.IdempotencyKey!, cancellationToken);
+            var key = first.IdempotencyKey!;
+            var baseKey = key.Contains('#', StringComparison.Ordinal) ? key[..key.LastIndexOf('#')] : key;
+            return new AddDuplicate(await FindByIdempotencyKeyAsync(first.TenantId, baseKey, cancellationToken));
         }
     }
 
@@ -42,9 +75,15 @@ internal sealed class MessageRepository(RelayDbContext db) : IMessageRepository
             .Include(m => m.Events.OrderBy(e => e.Sequence))
             .SingleOrDefaultAsync(m => m.TenantId == tenantId && m.Id == messageId, cancellationToken);
 
-    public Task<Message?> FindByIdempotencyKeyAsync(Guid tenantId, string idempotencyKey, CancellationToken cancellationToken) =>
-        db.Messages.AsNoTracking()
-            .SingleOrDefaultAsync(m => m.TenantId == tenantId && m.IdempotencyKey == idempotencyKey, cancellationToken);
+    public async Task<IReadOnlyList<Message>> FindByIdempotencyKeyAsync(Guid tenantId, string idempotencyKey, CancellationToken cancellationToken)
+    {
+        var bulkPrefix = idempotencyKey + "#";
+        return await db.Messages.AsNoTracking()
+            .Where(m => m.TenantId == tenantId
+                && (m.IdempotencyKey == idempotencyKey || m.IdempotencyKey!.StartsWith(bulkPrefix)))
+            .OrderBy(m => m.Id)
+            .ToListAsync(cancellationToken);
+    }
 
     public async Task<IReadOnlyList<Message>> ListAsync(Guid tenantId, Guid? before, int limit, CancellationToken cancellationToken)
     {
@@ -55,6 +94,38 @@ internal sealed class MessageRepository(RelayDbContext db) : IMessageRepository
         }
 
         return await query.OrderByDescending(m => m.Id).Take(limit).ToListAsync(cancellationToken);
+    }
+}
+
+internal sealed class SuppressionStore(RelayDbContext db) : ISuppressionStore
+{
+    public async Task<IReadOnlyList<string>> FindSuppressedAsync(
+        Guid tenantId, IEnumerable<string> addresses, CancellationToken cancellationToken)
+    {
+        var normalized = addresses.Select(EmailAddress.Normalize).Distinct(StringComparer.Ordinal).ToList();
+        return await db.Suppressions.AsNoTracking()
+            .Where(s => s.TenantId == tenantId && normalized.Contains(s.Address))
+            .Select(s => s.Address)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Suppression>> ListAsync(Guid tenantId, int limit, string? after, CancellationToken cancellationToken)
+    {
+        var query = db.Suppressions.AsNoTracking().Where(s => s.TenantId == tenantId);
+        if (after is not null)
+        {
+            query = query.Where(s => s.Address.CompareTo(after) > 0);
+        }
+
+        return await query.OrderBy(s => s.Address).Take(limit).ToListAsync(cancellationToken);
+    }
+
+    public async Task<bool> RemoveAsync(Guid tenantId, string address, CancellationToken cancellationToken)
+    {
+        var normalized = EmailAddress.Normalize(address);
+        return await db.Suppressions
+            .Where(s => s.TenantId == tenantId && s.Address == normalized)
+            .ExecuteDeleteAsync(cancellationToken) > 0;
     }
 }
 

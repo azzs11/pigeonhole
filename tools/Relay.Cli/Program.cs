@@ -11,6 +11,9 @@ const string Usage = """
       relay db migrate
       relay keys create --tenant <name> [--name <key name>] [--scopes messages:send,messages:read]
       relay keys revoke --prefix <rly_xxxxxxxx>
+      relay tenants quota --tenant <name> --daily <recipients per UTC day>
+      relay tenants pause --tenant <name> --reason <text>
+      relay tenants resume --tenant <name>
 
     Connection string: ConnectionStrings__Relay environment variable, else appsettings.json.
     """;
@@ -52,6 +55,35 @@ switch (args)
         var revoked = await services.GetRequiredService<ApiKeyService>().RevokeAsync(prefix, CancellationToken.None);
         Console.WriteLine(revoked ? $"Revoked {prefix}." : $"No key with prefix {prefix}.");
         return revoked ? 0 : 1;
+
+    case ["tenants", var action, ..] when Option("--tenant") is { } name && action is "quota" or "pause" or "resume":
+        var db = services.GetRequiredService<RelayDbContext>();
+        var found = await db.Tenants.SingleOrDefaultAsync(t => t.Name == name);
+        if (found is null)
+        {
+            await Console.Error.WriteLineAsync($"No tenant named {name}.");
+            return 1;
+        }
+
+        switch (action)
+        {
+            case "quota" when int.TryParse(Option("--daily"), out var daily):
+                found.SetDailyQuota(daily);
+                break;
+            case "pause":
+                found.PauseSending(Option("--reason") ?? "Paused by an operator.", DateTimeOffset.UtcNow);
+                break;
+            case "resume":
+                found.ResumeSending();
+                break;
+            default:
+                await Console.Error.WriteLineAsync(Usage);
+                return 2;
+        }
+
+        await db.SaveChangesAsync();
+        Console.WriteLine($"{name}: quota {found.DailyQuota}/day, {(found.IsSendingPaused ? $"paused ({found.PauseReason})" : "sending")}.");
+        return 0;
 
     default:
         await Console.Error.WriteLineAsync(Usage);
