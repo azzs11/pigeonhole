@@ -5,8 +5,9 @@ harmful sends does it stop, and how often does it get in the way of legitimate o
 
 Run it: `bench/run-agentmailbench.sh` (about 15 s; needs Docker). It writes
 `bench/results/agentmailbench/results.json`, rewrites the README table, and gates on the targets.
-The full-Guard thresholds also run on every pull request, as the integration test
-`Full_guard_meets_the_agentmailbench_thresholds`.
+The full-Guard block, false-block and approval thresholds also run on every pull request, as the
+integration test `Full_guard_meets_the_agentmailbench_thresholds`. The p99 target is gated only
+here: the test suite runs in parallel on shared CI runners, where timing measures the neighbours.
 
 ## Corpus
 
