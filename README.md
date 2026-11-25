@@ -6,10 +6,9 @@
 Durable, idempotent email delivery for .NET, with provider failover and an
 **Agent Send Guard** that lets AI agents send mail safely.
 
-> **Status: early scaffold (Phase 0 of 8).** The API accepts and stores messages
-> in memory but does **not** send email yet. Persistence, the outbox and real
-> delivery arrive in Phases 1 and 2. Nothing below is a measured claim until a
-> benchmark result in `bench/results/` backs it.
+> **Status: Phase 1 of 8.** Messages are accepted durably into PostgreSQL with an
+> outbox row, but are **not sent yet**. Real delivery arrives in Phase 2. Nothing
+> below is a measured claim until a benchmark result in `bench/results/` backs it.
 
 ## What it is (and is not)
 
@@ -24,15 +23,27 @@ Durable, idempotent email delivery for .NET, with provider failover and an
 ## Quick start
 
 Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download) (pinned in
-`global.json`).
+`global.json`) and Docker.
 
 ```bash
-dotnet build
-dotnet test
-dotnet run --project src/Relay.Api      # http://localhost:5238
+docker compose -f deploy/docker-compose.yml up -d           # PostgreSQL on :5433
+dotnet run --project tools/Relay.Cli -- keys create --tenant demo   # prints a key once
+dotnet run --project src/Relay.Api                           # http://localhost:5238, docs at /docs
+
+curl -H "Authorization: Bearer <key>" -H "Idempotency-Key: demo-1" \
+     -H "Content-Type: application/json" \
+     -d '{"to":["r@example.test"],"subject":"Hi","text":"Hello"}' \
+     http://localhost:5238/v1/messages
 ```
 
-Example requests are in [`src/Relay.Api/Relay.Api.http`](src/Relay.Api/Relay.Api.http).
+In Development the API applies migrations on startup. Elsewhere, run
+`relay db migrate`. More requests are in
+[`src/Relay.Api/Relay.Api.http`](src/Relay.Api/Relay.Api.http). Design decisions are in
+[`docs/adr/`](docs/adr/).
+
+```bash
+dotnet test   # unit, architecture, and integration tests (integration needs Docker)
+```
 
 ## Layout
 
@@ -45,14 +56,15 @@ Example requests are in [`src/Relay.Api/Relay.Api.http`](src/Relay.Api/Relay.Api
 | `Relay.Worker` | Outbox relay and schedulers (Phase 2). |
 | `Relay.Guard` | Agent Send Guard policy engine (Phase 5). |
 | `Relay.Mcp` | MCP server exposing the Guard (Phase 5). |
+| `tools/Relay.Cli` | Operator CLI: migrations, create and revoke API keys. |
 
 Dependencies point inward. `tests/Relay.ArchitectureTests` fails the build if
 they don't.
 
 ## Roadmap
 
-0. Clean repo, .NET 10, CI ← *you are here*
-1. Durable core (PostgreSQL, transactional accept, idempotency keys) and security fixes
+0. Clean repo, .NET 10, CI
+1. Durable core (PostgreSQL, transactional accept, idempotency keys) and security fixes ← *you are here*
 2. Delivery engine: outbox relay, providers, retries, failover
 3. Webhooks, suppression, atomic quotas
 4. Observability and **MailChaos**, a failure-injection benchmark
