@@ -6,7 +6,9 @@
       "package-name": "pigeonhole",
       "release-as": "1.0.0",
       "changelog-path": "CHANGELOG.md",
-      "include-v-in-tag": true
+      "include-v-in-tag": true,
+      "include-component-in-tag": false
     }
-  }
+  },
+  "include-component-in-tag": false
 }
