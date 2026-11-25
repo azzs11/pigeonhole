@@ -1,0 +1,49 @@
+# One command, whole stack, sandbox mode: `docker compose up`
+#   dashboard  http://localhost:5173   (click "Try the sandbox")
+#   API docs   http://localhost:5173/docs   (API: http://localhost:5173/v1/...)
+#   test inbox http://localhost:8025    (Mailpit: nothing is ever delivered for real)
+# Dependencies only, for running the .NET apps yourself: docker compose -f deploy/docker-compose.yml up -d
+include:
+  - deploy/docker-compose.yml
+
+x-relay-env: &relay-env
+  ConnectionStrings__Relay: Host=postgres;Port=5432;Database=relay;Username=relay;Password=relay_local_dev
+  Relay__Sandbox__Enabled: "true"
+  Relay__Sandbox__MailpitApi: http://mailpit:8025/
+  Relay__Sandbox__MailpitPublicUrl: http://localhost:8025/
+  Relay__Messaging__DefaultFrom: noreply@pigeonhole.test
+
+services:
+  api:
+    build: { context: ., dockerfile: deploy/Dockerfile.dotnet, args: { PROJECT: Relay.Api } }
+    environment:
+      <<: *relay-env
+      ASPNETCORE_URLS: http://+:8080
+      Database__MigrateOnStartup: "true"
+      # Trust X-Forwarded-For only from the dashboard's nginx on the compose network (per-IP demo-key limit).
+      Relay__Proxy__KnownNetworks__0: 172.16.0.0/12
+    # Not published: the dashboard's nginx (:5173) proxies /v1 and /docs, so X-Forwarded-For can only come from it.
+    expose: ["8080"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: unless-stopped
+
+  worker:
+    build: { context: ., dockerfile: deploy/Dockerfile.dotnet, args: { PROJECT: Relay.Worker } }
+    environment:
+      <<: *relay-env
+      Relay__Providers__0__Name: mailpit
+      Relay__Providers__0__Type: Smtp
+      Relay__Providers__0__Smtp__Host: mailpit
+      Relay__Providers__0__Smtp__Port: "1025"
+      Relay__Providers__0__Smtp__Security: None
+    depends_on:
+      postgres: { condition: service_healthy }
+      api: { condition: service_started }
+    restart: unless-stopped
+
+  web:
+    build: { context: ., dockerfile: deploy/Dockerfile.web }
+    ports: ["5173:80"]
+    depends_on: [api]
+    restart: unless-stopped

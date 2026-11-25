@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+**/node_modules/
+web/dist/
+web/e2e/.auth/
+web/test-results/
+web/playwright-report/
+bench/.venv/
+.git/
+CLAUDE.md
+*.log

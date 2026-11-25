@@ -1,0 +1,11 @@
+FROM node:24.22.3-alpine AS build
+WORKDIR /src/web
+COPY web/package.json web/package-lock.json ./
+RUN npm ci
+COPY web/ ./
+COPY bench/results/mailchaos/results.json /src/bench/results/mailchaos/results.json
+RUN npx vite build
+
+FROM nginx:1.31.10-alpine
+COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /src/web/dist /usr/share/nginx/html

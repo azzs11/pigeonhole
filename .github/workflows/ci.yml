@@ -76,6 +76,24 @@ jobs:
       - name: Component tests
         run: npm test
 
+  compose:
+    # The README promise: `docker compose up` on a clean machine, then one request reaches the test inbox.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [build-test, web]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: docker compose up
+        run: docker compose up -d --build --wait --wait-timeout 300 postgres mailpit api web && docker compose up -d worker
+
+      - name: Sandbox key, one request, one letter in Mailpit
+        run: deploy/smoke.sh http://localhost:5173 http://localhost:8025
+
+      - name: Logs
+        if: failure()
+        run: docker compose logs --no-color api worker web
+
   e2e:
     # Full stack: PostgreSQL + Mailpit (compose), the API and a worker in Development (sandbox on), the built dashboard.
     runs-on: ubuntu-latest
