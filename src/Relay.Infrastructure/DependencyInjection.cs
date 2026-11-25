@@ -41,7 +41,7 @@ public static class DependencyInjection
         ArgumentNullException.ThrowIfNull(options);
         services.AddSingleton(options);
         services.AddSingleton(sp => new ProviderChain(
-            sp.GetServices<IEmailProvider>(), options, sp.GetRequiredService<TimeProvider>()));
+            sp.GetServices<IEmailProvider>(), options, sp.GetRequiredService<TimeProvider>(), sp.GetService<IProviderInterceptor>()));
         services.AddSingleton<DeliveryEngine>();
         return services;
     }
@@ -81,6 +81,33 @@ public static class DependencyInjection
     public static IServiceCollection AddRelayQueueMetrics(this IServiceCollection services)
     {
         services.TryAddSingleton<Observability.QueueMetrics>();
+        return services;
+    }
+
+    /// <summary>Dashboard queries, and the sandbox when it is enabled (API and worker).</summary>
+    public static IServiceCollection AddRelayOps(this IServiceCollection services, Sandbox.SandboxOptions sandbox)
+    {
+        ArgumentNullException.ThrowIfNull(sandbox);
+        services.AddSingleton(sandbox);
+        services.AddScoped<Sandbox.OpsQueries>();
+        if (sandbox.Enabled)
+        {
+            services.TryAddSingleton<IProviderInterceptor, Sandbox.SandboxInterceptor>();
+        }
+
+        return services;
+    }
+
+    /// <summary>The sandbox's API side (batch, bounce, switches, promises). Needs <see cref="AddRelayWebhooks"/>.</summary>
+    public static IServiceCollection AddRelaySandboxApi(this IServiceCollection services, Sandbox.SandboxOptions sandbox)
+    {
+        ArgumentNullException.ThrowIfNull(sandbox);
+        if (sandbox.Enabled)
+        {
+            services.AddHttpClient(nameof(Sandbox.SandboxService));
+            services.AddScoped<Sandbox.SandboxService>();
+        }
+
         return services;
     }
 

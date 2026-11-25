@@ -20,6 +20,8 @@ public sealed class RelayDbContext(DbContextOptions<RelayDbContext> options) : D
     public DbSet<AgentRun> AgentRuns => Set<AgentRun>();
     public DbSet<ApprovalRequest> Approvals => Set<ApprovalRequest>();
     public DbSet<GuardAuditEntry> GuardAudit => Set<GuardAuditEntry>();
+    public DbSet<ProviderHealth> ProviderHealth => Set<ProviderHealth>();
+    public DbSet<SandboxSwitches> SandboxSwitches => Set<SandboxSwitches>();
 
     public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
@@ -51,6 +53,15 @@ public sealed class RelayDbContext(DbContextOptions<RelayDbContext> options) : D
         modelBuilder.Entity<AgentRun>(ConfigureAgentRun);
         modelBuilder.Entity<ApprovalRequest>(ConfigureApproval);
         modelBuilder.Entity<GuardAuditEntry>(ConfigureGuardAudit);
+        modelBuilder.Entity<ProviderHealth>(b =>
+        {
+            b.ToTable("provider_health");
+            b.HasKey(p => p.Name);
+            b.Property(p => p.Name).HasMaxLength(100);
+            b.Property(p => p.CircuitState).HasMaxLength(16);
+            b.Property(p => p.LastError).HasMaxLength(300);
+        });
+        modelBuilder.Entity<SandboxSwitches>(b => b.ToTable("sandbox_switches"));
 
         // Ids are created in code (Guid v7). Without this, EF treats a new child with a set key
         // (e.g. an appended MessageEvent) as an existing row and issues an UPDATE.

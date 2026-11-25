@@ -1,12 +1,15 @@
 using Microsoft.EntityFrameworkCore;
+using Relay.Infrastructure.Delivery;
 using Relay.Infrastructure.Observability;
 using Relay.Infrastructure.Persistence;
+using Relay.Infrastructure.Sandbox;
 
 namespace Relay.Worker;
 
-/// <summary>Samples messages-by-state and outbox depth every 15 s for the gauges.</summary>
+/// <summary>Samples messages-by-state and outbox depth every 5 s for the gauges and the dashboard.</summary>
 internal sealed partial class MetricsSnapshotService(
-    IServiceScopeFactory scopes, QueueMetrics metrics, TimeProvider time, ILogger<MetricsSnapshotService> logger) : BackgroundService
+    IServiceScopeFactory scopes, QueueMetrics metrics, ProviderChain providers, TimeProvider time, ILogger<MetricsSnapshotService> logger)
+    : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -21,13 +24,14 @@ internal sealed partial class MetricsSnapshotService(
                     .ToDictionaryAsync(x => x.Status.ToString(), x => x.Count, stoppingToken);
                 var depth = await db.Outbox.LongCountAsync(o => o.ProcessedAt == null, stoppingToken);
                 metrics.Update(byStatus, depth);
+                await scope.ServiceProvider.GetRequiredService<OpsQueries>().SaveProviderHealthAsync(providers.Snapshot(), stoppingToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 LogSnapshotFailed(logger, ex);
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(15), time, stoppingToken);
+            await Task.Delay(TimeSpan.FromSeconds(5), time, stoppingToken);
         }
     }
 

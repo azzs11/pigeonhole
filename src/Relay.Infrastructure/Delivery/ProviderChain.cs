@@ -20,12 +20,22 @@ public sealed class ProviderChain
     private readonly TimeProvider _time;
     private readonly ConcurrentDictionary<string, ResiliencePipeline<ProviderOutcome>> _pipelines = new(StringComparer.Ordinal);
 
-    public ProviderChain(IEnumerable<IEmailProvider> providers, DeliveryOptions options, TimeProvider time)
+    private readonly ProviderStats _stats;
+    private readonly IProviderInterceptor? _interceptor;
+
+    public ProviderChain(
+        IEnumerable<IEmailProvider> providers, DeliveryOptions options, TimeProvider time, IProviderInterceptor? interceptor = null)
     {
+        ArgumentNullException.ThrowIfNull(time);
         _providers = [.. providers];
         _options = options;
         _time = time;
+        _stats = new ProviderStats(time);
+        _interceptor = interceptor;
     }
+
+    /// <summary>Attempts, failures and circuit state per provider over the last 5 minutes.</summary>
+    public IReadOnlyList<ProviderSnapshot> Snapshot() => _stats.Snapshot(Names);
 
     public IReadOnlyList<string> Names => [.. _providers.Select(p => p.Name)];
 
@@ -50,10 +60,13 @@ public sealed class ProviderChain
             try
             {
                 var outcome = await Pipeline(provider).ExecuteAsync(
-                    static (state, token) => new ValueTask<ProviderOutcome>(state.provider.SendAsync(state.email, token)),
-                    (provider, email),
+                    static (state, token) => new ValueTask<ProviderOutcome>(state.interceptor is null
+                        ? state.provider.SendAsync(state.email, token)
+                        : state.interceptor.SendAsync(state.provider, state.email, t => state.provider.SendAsync(state.email, t), token)),
+                    (provider, email, interceptor: _interceptor),
                     cancellationToken);
-                Record(provider.Name, outcome.Kind, started, activity);
+                _stats.Record(provider.Name, outcome.Kind, outcome.Detail);
+                Record(provider.Name, outcome.Kind, started, activity, stats: false);
                 if (outcome.Kind != ProviderOutcomeKind.Transient)
                 {
                     return (outcome, provider.Name);
@@ -77,8 +90,13 @@ public sealed class ProviderChain
         return last;
     }
 
-    private void Record(string provider, ProviderOutcomeKind kind, long started, Activity? activity, string? reason = null)
+    private void Record(string provider, ProviderOutcomeKind kind, long started, Activity? activity, string? reason = null, bool stats = true)
     {
+        if (stats)
+        {
+            _stats.Record(provider, kind, reason ?? kind.ToString());
+        }
+
         var outcome = reason ?? kind.ToString();
         activity?.SetTag("relay.outcome", outcome);
         RelayTelemetry.ProviderSends.Add(1,
@@ -91,6 +109,7 @@ public sealed class ProviderChain
         _pipelines.GetOrAdd(provider.Name, _ =>
         {
             var builder = new ResiliencePipelineBuilder<ProviderOutcome> { TimeProvider = _time };
+            var circuit = _stats.Circuits.GetOrAdd(provider.Name, _ => new CircuitBreakerStateProvider());
             if (_options.ProviderRetries > 0)
             {
                 builder.AddRetry(new RetryStrategyOptions<ProviderOutcome>
@@ -113,6 +132,7 @@ public sealed class ProviderChain
                     MinimumThroughput = 4,
                     SamplingDuration = TimeSpan.FromSeconds(30),
                     BreakDuration = TimeSpan.FromSeconds(30),
+                    StateProvider = circuit,
                 })
                 .AddTimeout(TimeSpan.FromSeconds(_options.ProviderTimeoutSeconds))
                 .Build();

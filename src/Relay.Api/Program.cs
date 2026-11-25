@@ -10,6 +10,7 @@ using Relay.Application;
 using Relay.Infrastructure;
 using Relay.Infrastructure.Observability;
 using Relay.Infrastructure.Persistence;
+using Relay.Infrastructure.Sandbox;
 using Relay.Infrastructure.Webhooks;
 using Scalar.AspNetCore;
 
@@ -17,6 +18,7 @@ var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
 builder.AddRelayObservability("relay-api").WithTracing(t => t.AddAspNetCoreInstrumentation()).WithMetrics(m => m.AddAspNetCoreInstrumentation());
 
+var sandbox = config.GetSection(SandboxOptions.Section).Get<SandboxOptions>() ?? new();
 var connectionString = config.GetConnectionString("Relay")
     ?? throw new InvalidOperationException("ConnectionStrings:Relay is not configured.");
 builder.Services
@@ -24,7 +26,9 @@ builder.Services
     .AddRelayDelivery(config.GetSection(DeliveryOptions.Section).Get<DeliveryOptions>() ?? new())
     .AddRelayWebhooks(
         config.GetSection(WebhookOptions.Section).Get<WebhookOptions>() ?? new(),
-        config.GetSection(ReputationOptions.Section).Get<ReputationOptions>() ?? new());
+        config.GetSection(ReputationOptions.Section).Get<ReputationOptions>() ?? new())
+    .AddRelayOps(sandbox)
+    .AddRelaySandboxApi(sandbox);
 
 builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = ProblemDetailsDefaults.AddTraceId);
 builder.Services.AddExceptionHandler<UnhandledExceptionHandler>();
@@ -64,5 +68,6 @@ app.MapMessageEndpoints();
 app.MapSuppressionEndpoints();
 app.MapWebhookEndpoints();
 app.MapAgentEndpoints();
+app.MapOpsEndpoints(sandbox);
 
 await app.RunAsync();

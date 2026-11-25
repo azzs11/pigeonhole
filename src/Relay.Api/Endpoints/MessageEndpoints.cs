@@ -12,8 +12,10 @@ internal static class MessageEndpoints
     public static void MapMessageEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/v1/messages").WithTags("Messages");
-        group.MapPost("/", Send).RequireAuthorization(Scopes.MessagesSend);
-        group.MapPost("/bulk", SendBulk).RequireAuthorization(Scopes.MessagesSend);
+        group.MapPost("/", Send).RequireAuthorization(Scopes.MessagesSend)
+            .Produces<MessageResponse>(StatusCodes.Status202Accepted).ProducesValidationProblem().ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+        group.MapPost("/bulk", SendBulk).RequireAuthorization(Scopes.MessagesSend)
+            .Produces<BulkResponse>(StatusCodes.Status202Accepted).ProducesValidationProblem();
         group.MapGet("/{id:guid}", Get).RequireAuthorization(Scopes.MessagesRead);
         group.MapGet("/{id:guid}/explain", Explain).RequireAuthorization(Scopes.MessagesRead);
         group.MapGet("/", List).RequireAuthorization(Scopes.MessagesRead);

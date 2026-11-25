@@ -15,7 +15,7 @@ internal static class AgentEndpoints
     public static void MapAgentEndpoints(this IEndpointRouteBuilder app)
     {
         var runs = app.MapGroup("/v1/agent-runs").WithTags("Agent runs").RequireAuthorization(Scopes.AgentsManage);
-        runs.MapPost("/", CreateRun);
+        runs.MapPost("/", CreateRun).Produces<RunCreatedResponse>(StatusCodes.Status201Created).ProducesValidationProblem();
         runs.MapGet("/{runId:guid}/audit", Audit);
 
         var approvals = app.MapGroup("/v1/approvals").WithTags("Approvals").RequireAuthorization(Scopes.AgentsManage);
@@ -26,7 +26,7 @@ internal static class AgentEndpoints
             Decide(id, approve: false, body, user, guard, ct));
 
         var agent = app.MapGroup("/v1/agent").WithTags("Agent (run token)").RequireAuthorization(Scopes.AgentSend);
-        agent.MapPost("/messages", Send);
+        agent.MapPost("/messages", Send).Produces<AgentSendResult>(StatusCodes.Status202Accepted).ProducesProblem(StatusCodes.Status403Forbidden);
         agent.MapGet("/messages", ListSent);
         agent.MapGet("/messages/{id:guid}", Status);
         agent.MapPost("/approvals", RequestApproval);
@@ -41,24 +41,37 @@ internal static class AgentEndpoints
             return TypedResults.ValidationProblem(errors!);
         }
 
-        return TypedResults.Created($"/v1/agent-runs/{created.Run.Id}/audit", new
-        {
-            runId = created.Run.Id,
-            token = created.Token,
-            note = "The token is shown once. Give it to the agent's MCP server (RELAY_RUN_TOKEN); it can only send within this run.",
-            created.Run.ExpiresAt,
-            created.Run.TrustedRecipients,
-            created.Run.Policy,
-        });
+        return TypedResults.Created($"/v1/agent-runs/{created.Run.Id}/audit", new RunCreatedResponse(
+            created.Run.Id, created.Token,
+            "The token is shown once. Give it to the agent's MCP server (RELAY_RUN_TOKEN); it can only send within this run.",
+            created.Run.ExpiresAt, created.Run.TrustedRecipients, created.Run.Policy));
     }
 
     private static async Task<Ok<IReadOnlyList<GuardAuditEntry>>> Audit(
         Guid runId, ClaimsPrincipal user, AgentGuardService guard, CancellationToken cancellationToken) =>
         TypedResults.Ok(await guard.AuditAsync(user.TenantId(), runId, cancellationToken));
 
-    private static async Task<Ok<IReadOnlyList<ApprovalRequest>>> ListApprovals(
-        ClaimsPrincipal user, AgentGuardService guard, CancellationToken cancellationToken, ApprovalStatus? status = ApprovalStatus.Pending) =>
-        TypedResults.Ok(await guard.ListApprovalsAsync(user.TenantId(), status, cancellationToken));
+    /// <summary><c>status</c>: Pending (default), Approved, Rejected, Expired, or "all".</summary>
+    private static async Task<Results<Ok<IReadOnlyList<ApprovalRequest>>, ValidationProblem>> ListApprovals(
+        ClaimsPrincipal user, AgentGuardService guard, CancellationToken cancellationToken, string? status = null)
+    {
+        ApprovalStatus? filter = ApprovalStatus.Pending;
+        if (string.Equals(status, "all", StringComparison.OrdinalIgnoreCase))
+        {
+            filter = null;
+        }
+        else if (status is not null)
+        {
+            if (!Enum.TryParse<ApprovalStatus>(status, ignoreCase: true, out var parsed))
+            {
+                return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["status"] = ["Pending, Approved, Rejected, Expired or all."] });
+            }
+
+            filter = parsed;
+        }
+
+        return TypedResults.Ok(await guard.ListApprovalsAsync(user.TenantId(), filter, cancellationToken));
+    }
 
     private static async Task<IResult> Decide(
         Guid id, bool approve, DecisionRequest? body, ClaimsPrincipal user, AgentGuardService guard, CancellationToken cancellationToken)
@@ -107,6 +120,9 @@ internal static class AgentEndpoints
             detail: string.Join(" ", result.Reasons ?? []), extensions: new Dictionary<string, object?> { ["guard"] = result }),
     };
 }
+
+internal sealed record RunCreatedResponse(
+    Guid RunId, string Token, string Note, DateTimeOffset ExpiresAt, IReadOnlyList<string> TrustedRecipients, GuardPolicy Policy);
 
 internal sealed record DecisionRequest(string? Note);
 

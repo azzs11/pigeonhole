@@ -622,6 +622,75 @@ namespace Relay.Infrastructure.Migrations
                     b.ToTable("provider_events", (string)null);
                 });
 
+            modelBuilder.Entity("Relay.Infrastructure.Persistence.ProviderHealth", b =>
+                {
+                    b.Property<string>("Name")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<string>("CircuitState")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("circuit_state");
+
+                    b.Property<int>("Failures")
+                        .HasColumnType("integer")
+                        .HasColumnName("failures");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("last_error");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Name")
+                        .HasName("pk_provider_health");
+
+                    b.ToTable("provider_health", (string)null);
+                });
+
+            modelBuilder.Entity("Relay.Infrastructure.Persistence.SandboxSwitches", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    b.Property<double>("CrashRate")
+                        .HasColumnType("double precision")
+                        .HasColumnName("crash_rate");
+
+                    b.Property<int>("DelayMilliseconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("delay_milliseconds");
+
+                    b.PrimitiveCollection<string[]>("DownProviders")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("down_providers");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_sandbox_switches");
+
+                    b.ToTable("sandbox_switches", (string)null);
+                });
+
             modelBuilder.Entity("Relay.Domain.ApiKey", b =>
                 {
                     b.HasOne("Relay.Domain.Tenant", null)

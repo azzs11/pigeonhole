@@ -21,6 +21,7 @@ builder.Services
     .AddRelayCore(connectionString, messaging)
     .AddRelayDelivery(delivery)
     .AddRelayProviders(providers)
+    .AddRelayOps(builder.Configuration.GetSection(Relay.Infrastructure.Sandbox.SandboxOptions.Section).Get<Relay.Infrastructure.Sandbox.SandboxOptions>() ?? new())
     .AddRelayQueueMetrics()
     .AddHostedService<OutboxRelayService>()
     .AddHostedService<MetricsSnapshotService>();

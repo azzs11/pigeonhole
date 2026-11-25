@@ -17,6 +17,12 @@ internal sealed partial class OutboxRelayService(
             {
                 claimed = await engine.RunOnceAsync(stoppingToken);
             }
+            catch (Relay.Infrastructure.Sandbox.SandboxCrashException)
+            {
+                // Sandbox fault: behave like a process that died mid-batch. Leases expire and the reclaim marks Unknown.
+                LogSandboxCrash(logger);
+                claimed = 0;
+            }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 // A database blip must not kill the worker; leases make the retry safe.
@@ -33,6 +39,9 @@ internal sealed partial class OutboxRelayService(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Outbox relay {WorkerId} started")]
     private static partial void LogStarted(ILogger logger, string workerId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Sandbox crash injected after a provider accepted a message")]
+    private static partial void LogSandboxCrash(ILogger logger);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Outbox batch failed; retrying after the poll interval")]
     private static partial void LogBatchFailed(ILogger logger, Exception exception);
