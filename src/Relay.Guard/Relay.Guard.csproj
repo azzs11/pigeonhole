@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Agent Send Guard: policy engine, risk score, approval queue (Phase 5). -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\Relay.Application\Relay.Application.csproj" />
+  </ItemGroup>
+
+</Project>

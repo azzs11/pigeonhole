@@ -1,0 +1,55 @@
+# Requests for the Phase 0 API. Run `dotnet run --project src/Relay.Api`.
+# apiKey is the development seed key from InMemoryUserService. It is removed in
+# Phase 1, when keys are created with the CLI and stored hashed.
+
+@host = http://localhost:5238
+@apiKey = test-api-key-12345
+
+### Health (no key needed)
+GET {{host}}/health
+
+### Send one email
+# @name send
+POST {{host}}/api/emails/send
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "to": "recipient@example.test",
+  "subject": "Hello from Relay",
+  "body": "<p>It works.</p>",
+  "isHtml": true
+}
+
+### Get that email by id
+GET {{host}}/api/emails/{{send.response.body.$.id}}
+X-API-Key: {{apiKey}}
+
+### List my emails (paged)
+GET {{host}}/api/emails?page=1&pageSize=20
+X-API-Key: {{apiKey}}
+
+### Send to several recipients
+POST {{host}}/api/emails/send-bulk
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "to": ["a@example.test", "b@example.test"],
+  "subject": "Bulk hello",
+  "body": "Plain text body",
+  "isHtml": false
+}
+
+### Missing key -> 401
+GET {{host}}/api/emails
+
+### Validation error -> 400
+POST {{host}}/api/emails/send
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "to": "",
+  "subject": "No recipient"
+}

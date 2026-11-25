@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- EF Core, outbox, provider adapters, resilience (Phases 1-2). -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\Relay.Application\Relay.Application.csproj" />
+  </ItemGroup>
+
+</Project>

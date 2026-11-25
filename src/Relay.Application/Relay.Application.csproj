@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Use cases and ports. Depends only on Domain. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\Relay.Domain\Relay.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

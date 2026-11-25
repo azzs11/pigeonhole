@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Entities and the delivery state machine. References nothing. -->
+
+</Project>

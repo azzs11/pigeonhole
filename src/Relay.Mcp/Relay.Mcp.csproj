@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- MCP server exposing the Guard (Phase 5). Becomes an executable then. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\Relay.Guard\Relay.Guard.csproj" />
+  </ItemGroup>
+
+</Project>
