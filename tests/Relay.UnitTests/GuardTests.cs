@@ -12,21 +12,31 @@ public class SecretScannerTests
     private const string Upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     private const string Mixed = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
-    public static TheoryData<string, string> Secrets() => new()
+    // Only the kind is theory data: the fake secret is built inside the test, so test names stay the
+    // same from discovery to run (mutation testing needs that) while the value is still random.
+    public static TheoryData<string> Kinds() =>
+    [
+        "AWS access key", "GitHub token", "private key", "Stripe secret key",
+        "credential assignment", "JSON web token", "US social security number",
+    ];
+
+    private static string FakeSecret(string kind) => kind switch
     {
-        { "AWS access key", "key " + "AK" + "IA" + Rand(Upper, 16) },
-        { "GitHub token", "gh" + "p_" + Rand(Mixed, 36) },
-        { "private key", "-----BEGIN " + "OPENSSH PRIVATE KEY-----" },
-        { "Stripe secret key", "sk" + "_live_" + Rand(Mixed, 24) },
-        { "credential assignment", "password: " + Rand(Mixed, 8) + "9!" },
-        { "JSON web token", "eyJ" + Rand(Mixed, 12) + ".eyJ" + Rand(Mixed, 20) + "." + Rand(Mixed, 16) },
-        { "US social security number", "SSN 123-45-6789" },
+        "AWS access key" => "key " + "AK" + "IA" + Rand(Upper, 16),
+        "GitHub token" => "gh" + "p_" + Rand(Mixed, 36),
+        "private key" => "-----BEGIN " + "OPENSSH PRIVATE KEY-----",
+        "Stripe secret key" => "sk" + "_live_" + Rand(Mixed, 24),
+        "credential assignment" => "password: " + Rand(Mixed, 8) + "9!",
+        "JSON web token" => "eyJ" + Rand(Mixed, 12) + ".eyJ" + Rand(Mixed, 20) + "." + Rand(Mixed, 16),
+        "US social security number" => "SSN 123-45-6789",
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
     };
 
     [Theory]
-    [MemberData(nameof(Secrets))]
-    public void Detects_common_secret_shapes_and_masks_them(string kind, string text)
+    [MemberData(nameof(Kinds))]
+    public void Detects_common_secret_shapes_and_masks_them(string kind)
     {
+        var text = FakeSecret(kind);
         var finding = SecretScanner.Scan($"Hello, {text} thanks").ShouldHaveSingleItem();
 
         finding.Kind.ShouldBe(kind);

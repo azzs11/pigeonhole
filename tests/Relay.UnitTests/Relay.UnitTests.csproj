@@ -20,7 +20,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Relay.Domain\Relay.Domain.csproj" />
     <ProjectReference Include="..\..\src\Relay.Application\Relay.Application.csproj" />
+    <ProjectReference Include="..\..\src\Relay.Guard\Relay.Guard.csproj" />
     <ProjectReference Include="..\..\src\Relay.Infrastructure\Relay.Infrastructure.csproj" />
   </ItemGroup>
 
