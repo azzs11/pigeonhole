@@ -1,0 +1,33 @@
+{
+  "benchmark": "mutation testing (Stryker.NET, unit tests)",
+  "generatedAt": "2026-11-26T05:51:43.410721+00:00",
+  "projects": {
+    "Relay.Domain": {
+      "Survived": 15,
+      "Killed": 26,
+      "Ignored": 10,
+      "NoCoverage": 6,
+      "CompileError": 6,
+      "score": 55.3,
+      "scoreCovered": 63.4
+    },
+    "Relay.Guard": {
+      "Ignored": 45,
+      "NoCoverage": 127,
+      "CompileError": 37,
+      "Killed": 144,
+      "Survived": 19,
+      "score": 49.7,
+      "scoreCovered": 88.3
+    },
+    "Relay.Application": {
+      "Ignored": 43,
+      "CompileError": 26,
+      "Killed": 190,
+      "Survived": 68,
+      "NoCoverage": 30,
+      "score": 66.0,
+      "scoreCovered": 73.6
+    }
+  }
+}
