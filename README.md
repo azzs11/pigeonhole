@@ -42,11 +42,14 @@ git clone https://github.com/azzs11/pigeonhole && cd pigeonhole
 docker compose up
 ```
 
-| Door | What's behind it |
+Everything runs on your own machine. Once the containers are up, open these ports on it in
+your browser:
+
+| Port | What's behind it |
 |---|---|
-| <http://localhost:5173> | The dashboard. Click **Try the sandbox**: no key, no signup. |
-| <http://localhost:5173/docs> | The API reference (Scalar). |
-| <http://localhost:8025> | The test inbox (Mailpit). Everything "sent" lands here and nowhere else. |
+| 5173 | The dashboard. Click **Try the sandbox**: no key, no signup. |
+| 5173, path `/docs` | The API reference (Scalar). |
+| 8025 | The test inbox (Mailpit). Everything "sent" lands here and nowhere else. |
 
 The sandbox hands you a throwaway API key with its own tenant and a 200-a-day quota. It
 won't send real mail: in sandbox mode the worker refuses to start with any API provider (SES,
@@ -65,12 +68,12 @@ just *after* it accepted, cuts the network, restarts the database and replays we
 it counts. Method: [docs/benchmarks/mailchaos.md](docs/benchmarks/mailchaos.md).
 
 <!-- mailchaos:start -->
-Duplicates / lost per 10,000 messages (2,000 per run, seed 42, commit `766c6ff-dirty`, generated 2026-11-25). Fault rate is per provider call.
+Duplicates / lost per 10,000 messages (10,000 per run, seed 42, commit `3d4bc40-dirty`, generated 2026-11-26). Fault rate is per provider call.
 
 | System | 0% faults | 1% faults | 2% faults | 5% faults | 10% faults |
 |---|---|---|---|---|---|
-| naive send-then-save | 0 / 0 | 55 / 0 | 105 / 0 | 310 / 0 | 485 / 0 |
-| outbox only | 0 / 0 | 55 / 0 | 105 / 0 | 305 / 0 | 495 / 0 |
+| naive send-then-save | 0 / 0 | 52 / 0 | 90 / 0 | 237 / 0 | 494 / 0 |
+| outbox only | 0 / 0 | 52 / 0 | 90 / 0 | 235 / 0 | 488 / 0 |
 | outbox + unknown state | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 |
 
 ![MailChaos results](bench/results/mailchaos/mailchaos.png)
@@ -78,7 +81,24 @@ Duplicates / lost per 10,000 messages (2,000 per run, seed 42, commit `766c6ff-d
 
 Read the middle row twice. An outbox alone, the textbook fix, still duplicates: it retries
 anything that timed out, including sends that already went through. The **Unknown** state is
-what brings duplicates to zero.
+what brings duplicates to zero. It held at zero on five more seeds too (10,000 messages each,
+5% and 10% faults). The [testing report](docs/testing.md) has those runs.
+
+### How hard it was tested
+
+Each figure here links to the results file it came from. Full method and raw numbers:
+[docs/testing.md](docs/testing.md).
+
+<!-- testing:start -->
+| Test | What it does | Result |
+|---|---|---|
+| Unit, architecture and integration tests | xUnit against real PostgreSQL and Mailpit (Testcontainers) | 190 tests (116 unit, 8 architecture, 66 integration), all passing |
+| Property-based tests (FsCheck) | 7 invariants (state machine, backoff bounds, fingerprinting, the card scanner, header injection), 2,000 generated cases each | all hold |
+| Line coverage | unit + integration, migrations and generated code excluded | 85.6% ([summary](bench/results/coverage/summary.json)) |
+| MailChaos across seeds | 5 seeds × 10,000 messages at 5% and 10% faults | 0 lost, 0 duplicates in every run ([runs](bench/results/mailchaos-seeds/)) |
+| Real crash test | `kill -9` of live worker containers about once a second while they deliver 23,000 messages over SMTP | 0 lost, 0 duplicates; 40 left in Unknown, 15 of which never arrived and wait for an operator ([runs](bench/results/crash/)) |
+| Load test (open loop) | accept path, one tenant, API and PostgreSQL limited to 2 vCPU each | 500 req/s with no errors at p99 9.5 ms; fails at 750 req/s ([results](bench/results/load/accept-after.json)) |
+<!-- testing:end -->
 
 ### AgentMailBench: can an agent be talked into misbehaving?
 
@@ -165,8 +185,10 @@ Every attempt carries the same `Message-ID`, so the webhook can find its letter.
 
 ## Send something
 
+`$RELAY` is wherever the stack runs: the dashboard's address (port 5173), which proxies `/v1` to the API.
+
 ```bash
-curl http://localhost:5173/v1/messages \
+curl "$RELAY/v1/messages" \
   -H "Authorization: Bearer $KEY" \
   -H "Idempotency-Key: welcome-42" \
   -H "Content-Type: application/json" \
@@ -174,7 +196,7 @@ curl http://localhost:5173/v1/messages \
 ```
 
 Send it again with the same key and you get the same message back, not a second email. For a
-`$KEY`, run `curl -X POST http://localhost:5173/v1/sandbox/demo-key` (sandbox) or
+`$KEY`, run `curl -X POST "$RELAY/v1/sandbox/demo-key"` (sandbox) or
 `dotnet run --project tools/Relay.Cli -- keys create --tenant demo` (any setup).
 
 ### Give an agent a mailbox (MCP)
