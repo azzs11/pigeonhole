@@ -7,7 +7,14 @@
       "release-as": "1.0.0",
       "changelog-path": "CHANGELOG.md",
       "include-v-in-tag": true,
-      "include-component-in-tag": false
+      "include-component-in-tag": false,
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "web/package.json",
+          "jsonpath": "$.version"
+        }
+      ]
     }
   },
   "include-component-in-tag": false
