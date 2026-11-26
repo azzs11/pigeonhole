@@ -5,6 +5,9 @@ name: relay
 services:
   postgres:
     image: postgres:17-alpine
+    # Room for every app's pool (API 50 + worker 50 per instance) plus admin sessions; the default
+    # 100 equalled one pool and made PostgreSQL refuse connections under load (docs/testing.md).
+    command: ["postgres", "-c", "max_connections=200"]
     environment:
       POSTGRES_DB: relay
       POSTGRES_USER: relay
@@ -21,6 +24,10 @@ services:
 
   mailpit:
     image: axllent/mailpit:v1.34.0
+    environment:
+      # Mailpit keeps only 500 messages by default and silently drops older ones, which would
+      # break every "nothing sent twice" check that counts what arrived.
+      MP_MAX_MESSAGES: "200000"
     ports:
       - "1025:1025" # SMTP sink: nothing leaves this container
       - "8025:8025" # web UI and API: http://localhost:8025

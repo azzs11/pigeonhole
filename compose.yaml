@@ -7,7 +7,7 @@ include:
   - deploy/docker-compose.yml
 
 x-relay-env: &relay-env
-  ConnectionStrings__Relay: Host=postgres;Port=5432;Database=relay;Username=relay;Password=relay_local_dev
+  ConnectionStrings__Relay: Host=postgres;Port=5432;Database=relay;Username=relay;Password=relay_local_dev;Maximum Pool Size=50
   Relay__Sandbox__Enabled: "true"
   Relay__Sandbox__MailpitApi: http://mailpit:8025/
   Relay__Sandbox__MailpitPublicUrl: http://localhost:8025/
