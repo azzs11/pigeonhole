@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- LiveAgentBench: a real Claude model drives the agent tools against a running Relay stack.
+       Anthropic is the official Claude SDK (MIT); only this benchmark uses it. -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Anthropic" />
+  </ItemGroup>
+
+</Project>
