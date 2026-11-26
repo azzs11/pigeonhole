@@ -10,6 +10,7 @@ using System.Text.Json;
 // (no coordinated omission). Latency is measured from the scheduled time, not from the actual send.
 // Usage: dotnet run -c Release --project bench/LoadTest -- --url http://localhost:8080 --key rly_...
 //        [--rates 100,250,500,1000] [--seconds 30] [--warmup 5] [--out bench/results/load/accept.json]
+//        [--keys-file keys.txt]   one key per line (one tenant each); requests go round-robin across them
 string Arg(string name, string fallback)
 {
     var i = Array.IndexOf(args, name);
@@ -17,21 +18,23 @@ string Arg(string name, string fallback)
 }
 
 var url = new Uri(Arg("--url", "http://localhost:8080"));
-var key = Arg("--key", Environment.GetEnvironmentVariable("RELAY_KEY") ?? string.Empty);
+var keysFile = Arg("--keys-file", string.Empty);
+string[] keys = keysFile.Length > 0
+    ? [.. (await File.ReadAllLinesAsync(keysFile)).Select(k => k.Trim()).Where(k => k.Length > 0)]
+    : [Arg("--key", Environment.GetEnvironmentVariable("RELAY_KEY") ?? string.Empty)];
 var rates = Arg("--rates", "100,250,500,1000").Split(',').Select(r => int.Parse(r, CultureInfo.InvariantCulture)).ToArray();
 var seconds = int.Parse(Arg("--seconds", "30"), CultureInfo.InvariantCulture);
 var warmup = int.Parse(Arg("--warmup", "5"), CultureInfo.InvariantCulture);
 var output = Arg("--out", "bench/results/load/accept.json");
 var label = Arg("--label", "api 2 vCPU, postgres 2 vCPU");
-if (key.Length == 0)
+if (keys.Length == 0 || keys.Any(k => k.Length == 0))
 {
-    await Console.Error.WriteLineAsync("Pass --key or set RELAY_KEY.");
+    await Console.Error.WriteLineAsync("Pass --key, --keys-file or set RELAY_KEY.");
     return 2;
 }
 
 using var handler = new SocketsHttpHandler { MaxConnectionsPerServer = 2000, PooledConnectionLifetime = TimeSpan.FromMinutes(10) };
 using var http = new HttpClient(handler) { BaseAddress = url, Timeout = TimeSpan.FromSeconds(30) };
-http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", key);
 var runId = Guid.CreateVersion7().ToString("N")[..8];
 
 async Task<(double LatencyMs, int Status)> SendAsync(long scheduledTicks, Stopwatch clock, int n)
@@ -44,6 +47,7 @@ async Task<(double LatencyMs, int Status)> SendAsync(long scheduledTicks, Stopwa
             "application/json"),
     };
     request.Headers.Add("Idempotency-Key", $"load-{runId}-{n}");
+    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", keys[n % keys.Length]);
     int status;
     try
     {
@@ -118,6 +122,7 @@ var report = new
 {
     benchmark = "accept latency (open loop)",
     generatedAt = DateTimeOffset.UtcNow,
+    tenants = keys.Length,
     environment = new { label, cpus = Environment.ProcessorCount, os = System.Runtime.InteropServices.RuntimeInformation.OSDescription },
     secondsPerStep = seconds,
     warmupSeconds = warmup,
