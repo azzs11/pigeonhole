@@ -92,12 +92,13 @@ Each figure here links to the results file it came from. Full method and raw num
 <!-- testing:start -->
 | Test | What it does | Result |
 |---|---|---|
-| Unit, architecture and integration tests | xUnit against real PostgreSQL and Mailpit (Testcontainers) | 190 tests (116 unit, 8 architecture, 66 integration), all passing |
+| Unit, architecture and integration tests | xUnit against real PostgreSQL and Mailpit (Testcontainers) | 228 tests (154 unit, 8 architecture, 66 integration), all passing |
 | Property-based tests (FsCheck) | 7 invariants (state machine, backoff bounds, fingerprinting, the card scanner, header injection), 2,000 generated cases each | all hold |
 | Line coverage | unit + integration, migrations and generated code excluded | 85.6% ([summary](bench/results/coverage/summary.json)) |
 | MailChaos across seeds | 5 seeds × 10,000 messages at 5% and 10% faults | 0 lost, 0 duplicates in every run ([runs](bench/results/mailchaos-seeds/)) |
 | Real crash test | `kill -9` of live worker containers about once a second while they deliver 23,000 messages over SMTP | 0 lost, 0 duplicates; 40 left in Unknown, 15 of which never arrived and wait for an operator ([runs](bench/results/crash/)) |
-| Load test (open loop) | accept path, one tenant, API and PostgreSQL limited to 2 vCPU each | 500 req/s with no errors at p99 9.5 ms; fails at 750 req/s ([results](bench/results/load/accept-after.json)) |
+| Mutation testing (Stryker.NET) | small deliberate bugs in Domain, Guard and Application; does a unit test notice? | 34–53% at first; 55–66% after 38 targeted tests (Guard: 88% of covered code) ([summary](bench/results/mutation/summary.json)) |
+| Load test (open loop) | accept path, API and PostgreSQL limited to 2 vCPU each | three database fixes took 500 req/s from mostly failing to clean. Repeat runs on a busy laptop drifted more than 10×, so no ceiling is claimed yet ([details](docs/testing.md#51-one-tenant-against-twenty-inconclusive-on-a-laptop)) |
 <!-- testing:end -->
 
 ### AgentMailBench: can an agent be talked into misbehaving?
