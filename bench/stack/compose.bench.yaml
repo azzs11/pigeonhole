@@ -1,0 +1,19 @@
+# Benchmark overlay for the root compose stack:
+#   docker compose -f compose.yaml -f bench/stack/compose.bench.yaml up -d --build
+# - publishes the API on :8080 so load goes straight to it (not through nginx)
+# - lifts the per-key rate limit so we measure the service, not the limiter
+# - shortens the worker lease so a killed worker's messages are reclaimed in seconds
+# - pins the CPU budget the plan's target is stated for (API 2 vCPU, PostgreSQL 2 vCPU via docker update)
+services:
+  api:
+    ports: ["8080:8080"]
+    cpus: 2
+    environment:
+      Relay__RateLimit__PermitsPerSecond: "100000"
+      Relay__RateLimit__Burst: "100000"
+      Relay__Delivery__LeaseSeconds: "10"
+  worker:
+    cpus: 1
+    environment:
+      Relay__Delivery__LeaseSeconds: "10"
+      Relay__Delivery__PollIntervalMilliseconds: "200"

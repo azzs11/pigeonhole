@@ -1,0 +1,45 @@
+{
+  "benchmark": "line coverage (unit + integration tests, merged)",
+  "generatedAt": "2026-11-26T04:30:17.137684+00:00",
+  "excluded": [
+    "EF migrations",
+    "generated code under obj/"
+  ],
+  "projects": {
+    "Relay.Api": {
+      "covered": 384,
+      "lines": 452,
+      "percent": 85.0
+    },
+    "Relay.Application": {
+      "covered": 346,
+      "lines": 378,
+      "percent": 91.5
+    },
+    "Relay.Domain": {
+      "covered": 175,
+      "lines": 188,
+      "percent": 93.1
+    },
+    "Relay.Guard": {
+      "covered": 428,
+      "lines": 473,
+      "percent": 90.5
+    },
+    "Relay.Infrastructure": {
+      "covered": 1190,
+      "lines": 1435,
+      "percent": 82.9
+    },
+    "Relay.Mcp": {
+      "covered": 14,
+      "lines": 38,
+      "percent": 36.8
+    }
+  },
+  "all": {
+    "covered": 2537,
+    "lines": 2964,
+    "percent": 85.6
+  }
+}

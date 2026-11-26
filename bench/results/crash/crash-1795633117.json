@@ -1,0 +1,22 @@
+{
+  "benchmark": "crash test (real SIGKILL of worker containers)",
+  "run": "crash-1795633117",
+  "generatedAt": "2026-11-25T18:59:40.468057+00:00",
+  "messages": 5000,
+  "workers": 3,
+  "kills": 28,
+  "killsDuringDelivery": 28,
+  "deliverySeconds": 57.0,
+  "killEverySeconds": 1.0,
+  "killWindowSeconds": 45,
+  "statusAtEnd": {
+    "Sent": 4992,
+    "Unknown": 8
+  },
+  "deliveredAtLeastOnce": 4998,
+  "duplicates": 0,
+  "lost": 0,
+  "unknown": 8,
+  "unknownThatHadArrived": 6,
+  "sentButNotInInbox": 0
+}
