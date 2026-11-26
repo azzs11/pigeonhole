@@ -1,0 +1,214 @@
+{
+  "benchmark": "MailChaos",
+  "version": 1,
+  "commit": "3d4bc40-dirty",
+  "seed": 4,
+  "generatedAt": "2026-11-26T04:36:22.408243+00:00",
+  "environment": {
+    "os": "macOS 27.0.0",
+    "cpus": 10,
+    "dotnet": ".NET 10.0.15"
+  },
+  "method": "docs/benchmarks/mailchaos.md",
+  "messagesPerRun": 10000,
+  "faultRates": [
+    0.05,
+    0.1
+  ],
+  "runs": [
+    {
+      "system": "naive send-then-save",
+      "faultRate": 0.05,
+      "messages": 10000,
+      "delivered": 10000,
+      "lost": 0,
+      "duplicates": 228,
+      "lostPer10k": 0,
+      "duplicatesPer10k": 228,
+      "unresolved": 0,
+      "clientGaveUp": 0,
+      "deliveryLatencyMs": {
+        "p50": 0.002,
+        "p99": 5.303
+      },
+      "webhookLagMs": {
+        "p50": 0,
+        "p99": 0,
+        "max": 0
+      },
+      "reconcileWindowSeconds": 2,
+      "unknownPolicy": "window",
+      "faultsInjected": {
+        "CrashAfterAccept": 108,
+        "CrashBeforeSend": 102,
+        "DatabaseRestart": 1,
+        "Outage": 112,
+        "TimeoutAfterAccept": 115,
+        "TimeoutBeforeAccept": 100
+      },
+      "durationSeconds": 0.78
+    },
+    {
+      "system": "outbox only",
+      "faultRate": 0.05,
+      "messages": 10000,
+      "delivered": 10000,
+      "lost": 0,
+      "duplicates": 224,
+      "lostPer10k": 0,
+      "duplicatesPer10k": 224,
+      "unresolved": 0,
+      "clientGaveUp": 0,
+      "deliveryLatencyMs": {
+        "p50": 4254.728,
+        "p99": 7874.695
+      },
+      "webhookLagMs": {
+        "p50": 0,
+        "p99": 0,
+        "max": 0
+      },
+      "reconcileWindowSeconds": 2,
+      "unknownPolicy": "window",
+      "faultsInjected": {
+        "CrashAfterAccept": 108,
+        "CrashBeforeSend": 102,
+        "DatabaseRestart": 1,
+        "Outage": 112,
+        "TimeoutAfterAccept": 115,
+        "TimeoutBeforeAccept": 100
+      },
+      "durationSeconds": 15.98
+    },
+    {
+      "system": "outbox \u002B unknown state",
+      "faultRate": 0.05,
+      "messages": 10000,
+      "delivered": 10000,
+      "lost": 0,
+      "duplicates": 0,
+      "lostPer10k": 0,
+      "duplicatesPer10k": 0,
+      "unresolved": 0,
+      "clientGaveUp": 0,
+      "deliveryLatencyMs": {
+        "p50": 3921.214,
+        "p99": 8591.659
+      },
+      "webhookLagMs": {
+        "p50": 5.3,
+        "p99": 24.1,
+        "max": 124
+      },
+      "reconcileWindowSeconds": 2,
+      "unknownPolicy": "window",
+      "faultsInjected": {
+        "CrashAfterAccept": 111,
+        "CrashBeforeSend": 99,
+        "DatabaseRestart": 1,
+        "DuplicateWebhook": 486,
+        "Outage": 116,
+        "TimeoutAfterAccept": 110,
+        "TimeoutBeforeAccept": 102
+      },
+      "durationSeconds": 17.26
+    },
+    {
+      "system": "naive send-then-save",
+      "faultRate": 0.1,
+      "messages": 10000,
+      "delivered": 10000,
+      "lost": 0,
+      "duplicates": 443,
+      "lostPer10k": 0,
+      "duplicatesPer10k": 443,
+      "unresolved": 0,
+      "clientGaveUp": 0,
+      "deliveryLatencyMs": {
+        "p50": 0.001,
+        "p99": 5.678
+      },
+      "webhookLagMs": {
+        "p50": 0,
+        "p99": 0,
+        "max": 0
+      },
+      "reconcileWindowSeconds": 2,
+      "unknownPolicy": "window",
+      "faultsInjected": {
+        "CrashAfterAccept": 211,
+        "CrashBeforeSend": 211,
+        "DatabaseRestart": 2,
+        "Outage": 214,
+        "TimeoutAfterAccept": 226,
+        "TimeoutBeforeAccept": 190
+      },
+      "durationSeconds": 1.02
+    },
+    {
+      "system": "outbox only",
+      "faultRate": 0.1,
+      "messages": 10000,
+      "delivered": 10000,
+      "lost": 0,
+      "duplicates": 438,
+      "lostPer10k": 0,
+      "duplicatesPer10k": 438,
+      "unresolved": 0,
+      "clientGaveUp": 0,
+      "deliveryLatencyMs": {
+        "p50": 3448.816,
+        "p99": 8070.908
+      },
+      "webhookLagMs": {
+        "p50": 0,
+        "p99": 0,
+        "max": 0
+      },
+      "reconcileWindowSeconds": 2,
+      "unknownPolicy": "window",
+      "faultsInjected": {
+        "CrashAfterAccept": 211,
+        "CrashBeforeSend": 211,
+        "DatabaseRestart": 2,
+        "Outage": 214,
+        "TimeoutAfterAccept": 226,
+        "TimeoutBeforeAccept": 190
+      },
+      "durationSeconds": 14.97
+    },
+    {
+      "system": "outbox \u002B unknown state",
+      "faultRate": 0.1,
+      "messages": 10000,
+      "delivered": 10000,
+      "lost": 0,
+      "duplicates": 0,
+      "lostPer10k": 0,
+      "duplicatesPer10k": 0,
+      "unresolved": 0,
+      "clientGaveUp": 0,
+      "deliveryLatencyMs": {
+        "p50": 4203.867,
+        "p99": 10204.381
+      },
+      "webhookLagMs": {
+        "p50": 5.4,
+        "p99": 23.7,
+        "max": 57.2
+      },
+      "reconcileWindowSeconds": 2,
+      "unknownPolicy": "window",
+      "faultsInjected": {
+        "CrashAfterAccept": 180,
+        "CrashBeforeSend": 215,
+        "DatabaseRestart": 2,
+        "DuplicateWebhook": 1017,
+        "Outage": 206,
+        "TimeoutAfterAccept": 209,
+        "TimeoutBeforeAccept": 180
+      },
+      "durationSeconds": 19.95
+    }
+  ]
+}

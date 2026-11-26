@@ -16,7 +16,7 @@ All three use the same in-memory provider, the same fault plan and seed, and the
 |---|---|
 | **naive send-then-save** | The request handler calls the provider, then saves the row. On any error the client retries. |
 | **outbox only** | The real Relay engine: transactional accept with an `Idempotency-Key`, outbox, SKIP LOCKED workers and leases. Unknown outcomes are treated as failures and resent at once (`UnknownOutcome = RetryImmediately`). |
-| **outbox + unknown state** | The real engine with the Unknown state: a timeout or a crash mid-send becomes Unknown and is not resent blindly. A provider delivery event reconciles it, matched by our deterministic Message-ID. If no event arrives within the 2 s reconcile window, it is resent (`RetryAfterWindow`). |
+| **outbox + unknown state** | The real engine with the Unknown state: a timeout or a crash mid-send becomes Unknown and is not resent blindly. A provider delivery event reconciles it, matched by our deterministic Message-ID. If no event arrives within the 2 s reconcile window, it is resent (`RetryAfterWindow`). Production defaults to `Hold` (wait for evidence, never guess); see docs/testing.md for what each policy costs. |
 
 ## Faults
 
@@ -38,7 +38,9 @@ In addition:
   (`pg_terminate_backend`). This happens at the same stage of work for every system.
 - **Duplicate webhooks** (system 3 only, since it is the only one that consumes events):
   each delivery event is sent twice with probability *f*. Events arrive 50–150 ms after
-  acceptance and are redelivered on any failure, as providers do.
+  acceptance and are redelivered on any failure, as providers do. Four consumers process them
+  concurrently, as an HTTP webhook endpoint would. `webhookLagMs` in the results records how late
+  each event was processed after it was due.
 
 "Process kills" are simulated in-process: an exception aborts the worker immediately, with no
 cleanup, and the worker restarts with a new identity. Its claimed rows stay leased until the
@@ -52,7 +54,7 @@ rather than through Toxiproxy. Both are deliberate deviations from the plan; see
   (its subject). It is the ground truth, independent of what any system believes.
 - **Lost** = logical messages with zero ledger entries after the run drains.
 - **Duplicates** = ledger entries minus distinct messages.
-- Both are reported per 10,000 messages. 2,000 messages per run, 8 concurrent clients, 4 workers.
+- Both are reported per 10,000 messages. 10,000 messages per run, 8 concurrent clients, 4 workers.
 - Each client retries any failed request up to 10 times, using the same `Idempotency-Key` for
   systems 2 and 3.
 - A run drains until every message is final or 60 s pass. Anything still open is reported
@@ -78,8 +80,11 @@ rather than through Toxiproxy. Both are deliberate deviations from the plan; see
   comparisons are meaningful.
 - Fault draws come from a seeded PRNG, but concurrency changes the draw order, so reruns
   match statistically, not bit for bit.
-- Process kills are simulated in-process, not with real `kill -9`. Network faults are
+- Process kills are simulated in-process, not with real `kill -9`. `bench/crash-test.sh` covers
+  that gap with real SIGKILLs of worker containers (docs/testing.md). Network faults are
   injected in the adapter, not with Toxiproxy.
 - System 3 can still duplicate if a provider event arrives after the reconcile window.
-  This run's event delay (≤ 150 ms) is well inside the 2 s window. Real providers can
-  be slower, so tune the window to your provider.
+  That is exactly what happened in an earlier version of this benchmark: its webhook consumer
+  stalled, events ran 5–30 s late, and system 3 sent 280–380 duplicates per 10,000. Now that the
+  consumer is fixed, processing lag is p99 under 30 ms. Real providers can be slower, so tune
+  the window to your provider, or keep the default `Hold`.

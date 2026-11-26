@@ -16,6 +16,9 @@ namespace MailChaos;
 internal sealed record RunContext(string ConnectionString, int Messages, FaultPlan Plan, Ledger Ledger, TimeSpan Deadline)
 {
     public ConcurrentDictionary<string, DateTimeOffset> Submitted { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>How late each delivery event was processed, relative to when the provider sent it.</summary>
+    public ConcurrentBag<double> WebhookLagMs { get; } = [];
     public int Unresolved { get; set; }
     public int ClientGaveUp;
 }
@@ -143,11 +146,11 @@ internal sealed class NaiveSystem : IDeliverySystem
 /// at once (an outbox with no Unknown state). With it, unknown outcomes wait for a provider event,
 /// or resend after the reconcile window if none arrives.
 /// </summary>
-internal sealed class OutboxSystem(bool reconcile) : IDeliverySystem
+internal sealed class OutboxSystem(bool reconcile, int reconcileWindowSeconds = 2, bool hold = false) : IDeliverySystem
 {
     private const int Workers = 4;
 
-    public string Name => reconcile ? "outbox + unknown state" : "outbox only";
+    public string Name => !reconcile ? "outbox only" : hold ? "outbox + unknown state (hold)" : "outbox + unknown state";
 
     public async Task RunAsync(RunContext run, CancellationToken cancellationToken)
     {
@@ -162,8 +165,8 @@ internal sealed class OutboxSystem(bool reconcile) : IDeliverySystem
                 BackoffBaseSeconds = 0,
                 ProviderRetries = 0,
                 ProviderTimeoutSeconds = 5,
-                UnknownOutcome = reconcile ? UnknownOutcomePolicy.RetryAfterWindow : UnknownOutcomePolicy.RetryImmediately,
-                ReconcileWindowSeconds = 2,
+                UnknownOutcome = !reconcile ? UnknownOutcomePolicy.RetryImmediately : hold ? UnknownOutcomePolicy.Hold : UnknownOutcomePolicy.RetryAfterWindow,
+                ReconcileWindowSeconds = reconcileWindowSeconds,
             })
             .AddRelayWebhooks(new WebhookOptions(), new ReputationOptions { Enabled = false });
         services.AddSingleton<IEmailProvider>(new ChaosProvider(run.Plan, run.Ledger, reconcile
@@ -196,7 +199,8 @@ internal sealed class OutboxSystem(bool reconcile) : IDeliverySystem
         background.AddRange(Enumerable.Range(0, Workers).Select(_ => WorkerLoopAsync(sp, stop.Token)));
         if (reconcile)
         {
-            background.Add(WebhookPumpAsync(sp, events, stop.Token));
+            // Providers deliver webhooks concurrently and the API serves them concurrently.
+            background.AddRange(Enumerable.Range(0, Workers).Select(_ => WebhookPumpAsync(sp, events, run.WebhookLagMs, stop.Token)));
         }
 
         await Shared.ForEachClientAsync(run, i => SubmitAsync(sp, run, tenantId, i, cancellationToken)).ConfigureAwait(false);
@@ -274,8 +278,12 @@ internal sealed class OutboxSystem(bool reconcile) : IDeliverySystem
     }
 
     private static async Task WebhookPumpAsync(
-        ServiceProvider sp, ConcurrentQueue<(DateTimeOffset Due, DeliveryEvent Event)> events, CancellationToken cancellationToken)
+        ServiceProvider sp, ConcurrentQueue<(DateTimeOffset Due, DeliveryEvent Event)> events, ConcurrentBag<double> lag, CancellationToken cancellationToken)
     {
+        // Sleep only after a full pass over the queue found nothing due. Sleeping whenever the head
+        // was not yet due stalled every due event behind it, and those stalls added up to tens of
+        // seconds of artificial webhook lag at 10,000 messages (docs/testing.md).
+        var notDueInARow = 0;
         while (!cancellationToken.IsCancellationRequested)
         {
             if (!events.TryDequeue(out var item))
@@ -287,15 +295,23 @@ internal sealed class OutboxSystem(bool reconcile) : IDeliverySystem
             if (item.Due > DateTimeOffset.UtcNow)
             {
                 events.Enqueue(item);
-                await Task.Delay(5, CancellationToken.None).ConfigureAwait(false);
+                if (++notDueInARow >= events.Count)
+                {
+                    notDueInARow = 0;
+                    await Task.Delay(5, CancellationToken.None).ConfigureAwait(false);
+                }
+
                 continue;
             }
+
+            notDueInARow = 0;
 
             try
             {
                 await using var scope = sp.CreateAsyncScope();
                 var result = await scope.ServiceProvider.GetRequiredService<DeliveryEventProcessor>()
                     .ProcessAsync(item.Event, cancellationToken).ConfigureAwait(false);
+                lag.Add((DateTimeOffset.UtcNow - item.Due).TotalMilliseconds);
                 if (result == EventResult.RetryLater)
                 {
                     events.Enqueue((DateTimeOffset.UtcNow.AddMilliseconds(200), item.Event));

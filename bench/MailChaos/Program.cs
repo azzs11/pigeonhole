@@ -7,8 +7,9 @@ using Npgsql;
 using Testcontainers.PostgreSql;
 
 // MailChaos: inject faults into three delivery designs and count lost and duplicated emails.
-// Usage: dotnet run -c Release --project bench/MailChaos -- [--messages 2000] [--rates 0,0.01,0.02,0.05,0.1]
+// Usage: dotnet run -c Release --project bench/MailChaos -- [--messages 10000] [--rates 0,0.01,0.02,0.05,0.1]
 //        [--seed 42] [--out bench/results/mailchaos/results.json] [--quick]
+//        [--window 2] [--policy window|hold] [--systems all|unknown]
 string Arg(string name, string fallback)
 {
     var i = Array.IndexOf(args, name);
@@ -16,7 +17,7 @@ string Arg(string name, string fallback)
 }
 
 var quick = args.Contains("--quick");
-var messages = int.Parse(Arg("--messages", quick ? "300" : "2000"), CultureInfo.InvariantCulture);
+var messages = int.Parse(Arg("--messages", quick ? "300" : "10000"), CultureInfo.InvariantCulture);
 var rates = Arg("--rates", quick ? "0,0.05" : "0,0.01,0.02,0.05,0.1")
     .Split(',').Select(r => double.Parse(r, CultureInfo.InvariantCulture)).ToArray();
 var seed = int.Parse(Arg("--seed", "42"), CultureInfo.InvariantCulture);
@@ -26,7 +27,12 @@ await using var postgres = new PostgreSqlBuilder("postgres:17-alpine").WithComma
 Console.WriteLine("Starting PostgreSQL...");
 await postgres.StartAsync();
 
-IDeliverySystem[] systems = [new NaiveSystem(), new OutboxSystem(reconcile: false), new OutboxSystem(reconcile: true)];
+var window = int.Parse(Arg("--window", "2"), CultureInfo.InvariantCulture);
+var policy = Arg("--policy", "window"); // window = RetryAfterWindow (resend after the window); hold = wait for evidence
+var only = Arg("--systems", "all"); // all | unknown
+IDeliverySystem[] systems = only == "unknown"
+    ? [new OutboxSystem(reconcile: true, window, hold: policy == "hold")]
+    : [new NaiveSystem(), new OutboxSystem(reconcile: false), new OutboxSystem(reconcile: true, window, hold: policy == "hold")];
 var runs = new List<object>();
 foreach (var rate in rates)
 {
@@ -53,6 +59,8 @@ foreach (var rate in rates)
             .Order()
             .ToArray();
         double Percentile(double p) => latencies.Length == 0 ? 0 : latencies[(int)Math.Min(latencies.Length - 1, Math.Floor(p * latencies.Length))];
+        var lags = run.WebhookLagMs.Order().ToArray();
+        double Lag(double p) => lags.Length == 0 ? 0 : Math.Round(lags[(int)Math.Min(lags.Length - 1, Math.Floor(p * lags.Length))], 1);
         var lost = messages - run.Ledger.Distinct;
         var duplicates = run.Ledger.Total - run.Ledger.Distinct;
         Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
@@ -70,6 +78,9 @@ foreach (var rate in rates)
             unresolved = run.Unresolved,
             clientGaveUp = run.ClientGaveUp,
             deliveryLatencyMs = new { p50 = Percentile(0.5), p99 = Percentile(0.99) },
+            webhookLagMs = new { p50 = Lag(0.5), p99 = Lag(0.99), max = lags.Length == 0 ? 0 : Math.Round(lags[^1], 1) },
+            reconcileWindowSeconds = window,
+            unknownPolicy = policy,
             faultsInjected = run.Plan.Injected.OrderBy(kv => kv.Key, StringComparer.Ordinal).ToDictionary(),
             durationSeconds = Math.Round(clock.Elapsed.TotalSeconds, 2),
         });

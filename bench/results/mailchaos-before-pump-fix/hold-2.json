@@ -1,0 +1,52 @@
+{
+  "benchmark": "MailChaos",
+  "version": 1,
+  "commit": "3d4bc40-dirty",
+  "seed": 1,
+  "generatedAt": "2026-11-25T19:07:54.032626+00:00",
+  "environment": {
+    "os": "macOS 27.0.0",
+    "cpus": 10,
+    "dotnet": ".NET 10.0.15"
+  },
+  "method": "docs/benchmarks/mailchaos.md",
+  "messagesPerRun": 10000,
+  "faultRates": [
+    0.1
+  ],
+  "runs": [
+    {
+      "system": "outbox \u002B unknown state (hold)",
+      "faultRate": 0.1,
+      "messages": 10000,
+      "delivered": 9572,
+      "lost": 428,
+      "duplicates": 0,
+      "lostPer10k": 428,
+      "duplicatesPer10k": 0,
+      "unresolved": 428,
+      "clientGaveUp": 0,
+      "deliveryLatencyMs": {
+        "p50": 22.749,
+        "p99": 1034.814
+      },
+      "webhookLagMs": {
+        "p50": 5293.7,
+        "p99": 6560.2,
+        "max": 6617.7
+      },
+      "reconcileWindowSeconds": 2,
+      "unknownPolicy": "hold",
+      "faultsInjected": {
+        "CrashAfterAccept": 206,
+        "CrashBeforeSend": 205,
+        "DatabaseRestart": 2,
+        "DuplicateWebhook": 949,
+        "Outage": 200,
+        "TimeoutAfterAccept": 197,
+        "TimeoutBeforeAccept": 220
+      },
+      "durationSeconds": 77.29
+    }
+  ]
+}

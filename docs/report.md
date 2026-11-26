@@ -10,8 +10,8 @@ cannot tell "not sent" from "sent, reply lost". We built Pigeonhole, a .NET deli
 with a transactional outbox, leased workers and an explicit **Unknown** delivery state, and
 measured it with **MailChaos**, a fault-injection benchmark that counts lost and duplicated
 messages against a ground-truth ledger. At fault rates from 1% to 10% per provider call, a
-naive send-then-save design and a textbook outbox both duplicated 55 to 495 messages per
-10,000. The outbox with an Unknown state duplicated none, and none of the three lost any. We
+naive send-then-save design and a textbook outbox both duplicated 52 to 494 messages per
+10,000. The outbox with an Unknown state duplicated none (also on five further seeds), and none of the three lost any. We
 also built an **Agent Send Guard** for AI agents with an email tool, and **AgentMailBench**, 150
 scripted scenarios. The full Guard stopped 95.6% of attack scenarios (86 of 90) with 0% false
 blocks and 0% of benign mail held for approval, at a p99 of 3.2 ms per call. The four misses
@@ -54,25 +54,25 @@ near-duplicate content. The outcome is Send, Hold (needs a human with a differen
 ## 3. MailChaos
 
 **Setup.** Three systems share one in-memory provider, fault plan, seed and client behaviour.
-There are 2,000 messages per run, 8 clients, 4 workers, and clients retry up to 10 times. Each
+There are 10,000 messages per run, 8 clients, 4 workers, and clients retry up to 10 times. Each
 provider call draws a fault with probability *f*, uniformly from: crash before send, crash
 after accept, timeout before accept, timeout after accept, outage. On top of that, the database
 is restarted round(*f*×20) times per run, and system 3 receives duplicate webhooks with
 probability *f*. A ledger of provider acceptances is the ground truth. Full method:
 [benchmarks/mailchaos.md](benchmarks/mailchaos.md). Run: `bench/run-mailchaos.sh`.
 
-**Results** (duplicates / lost per 10,000; seed 42):
+**Results** (duplicates / lost per 10,000; 10,000 messages per run, seed 42):
 
 | System | 0% | 1% | 2% | 5% | 10% |
 |---|---|---|---|---|---|
-| naive send-then-save | 0 / 0 | 55 / 0 | 105 / 0 | 310 / 0 | 485 / 0 |
-| outbox only | 0 / 0 | 55 / 0 | 105 / 0 | 305 / 0 | 495 / 0 |
+| naive send-then-save | 0 / 0 | 52 / 0 | 90 / 0 | 237 / 0 | 494 / 0 |
+| outbox only | 0 / 0 | 52 / 0 | 90 / 0 | 235 / 0 | 488 / 0 |
 | outbox + unknown state | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 |
 
 **Reading.** The outbox makes acceptance durable but does nothing for duplicates. Its curve
 tracks the naive one because the same thing drives both: after-accept faults read as failures.
 Two of the five fault kinds are after-accept, which alone predicts about 2/5 × *f* of calls
-duplicating: 400 per 10,000 at *f* = 10%, against 485 to 495 measured. The gap is not
+duplicating: 400 per 10,000 at *f* = 10%, against 488 to 494 measured. The gap is not
 attributed separately here; a fault can strike a message more than once, and the database
 restarts sit on top. The Unknown state
 removes that path. Its cost is latency: Unknown messages wait for evidence.
